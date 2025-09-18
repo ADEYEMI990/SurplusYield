@@ -6,6 +6,7 @@ export interface IUser extends Document {
   password: string;
   role: "user" | "admin";
   status: "active" | "disabled";
+  kycStatus?: "pending" | "approved" | "rejected";
 }
 
 const userSchema = new Schema<IUser>(
@@ -14,7 +15,8 @@ const userSchema = new Schema<IUser>(
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     role: { type: String, enum: ["user", "admin"], default: "user" },
-    status: { type: String, enum: ["active", "disabled"], default: "active" }
+    status: { type: String, enum: ["active", "disabled"], default: "active" },
+    kycStatus: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
   },
   { timestamps: true }
 );
