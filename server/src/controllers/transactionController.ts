@@ -32,3 +32,17 @@ export const getAllTransactions = async (_: Request, res: Response) => {
     res.status(500).json({ message: "Error fetching transactions" });
   }
 };
+
+export const updateTransactionStatus = async (req: Request, res: Response) => {
+  try {
+    const tx = await Transaction.findById(req.params.id);
+    if (!tx) return res.status(404).json({ message: "Transaction not found" });
+
+    tx.status = req.body.status; // "completed" | "failed"
+    await tx.save();
+
+    res.json({ message: `Transaction ${tx.status}`, tx });
+  } catch {
+    res.status(500).json({ message: "Error updating transaction" });
+  }
+};

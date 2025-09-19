@@ -16,10 +16,24 @@ export const createPlan = async (req: Request, res: Response) => {
 // Get all plans (Public for users)
 export const getPlans = async (_: Request, res: Response) => {
   try {
-    const plans = await Plan.find({ isActive: true });
+    const plans = await Plan.find();
     res.json(plans);
   } catch (error) {
     res.status(500).json({ message: "Error fetching plans" });
+  }
+};
+
+// Toggle plan status
+export const togglePlanStatus = async (req: Request, res: Response) => {
+  try {
+    const plan = await Plan.findById(req.params.id);
+    if (!plan) return res.status(404).json({ message: "Plan not found" });
+
+    plan.isActive = !plan.isActive;
+    await plan.save();
+    res.json({ message: `Plan ${plan.isActive ? "activated" : "deactivated"}` });
+  } catch {
+    res.status(500).json({ message: "Error toggling plan" });
   }
 };
 

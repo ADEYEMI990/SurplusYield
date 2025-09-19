@@ -7,6 +7,8 @@ export interface IUser extends Document {
   role: "user" | "admin";
   status: "active" | "disabled";
   kycStatus?: "pending" | "approved" | "rejected";
+  referralCode?: string;
+  referredBy?: mongoose.Schema.Types.ObjectId;
 }
 
 const userSchema = new Schema<IUser>(
@@ -17,6 +19,8 @@ const userSchema = new Schema<IUser>(
     role: { type: String, enum: ["user", "admin"], default: "user" },
     status: { type: String, enum: ["active", "disabled"], default: "active" },
     kycStatus: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
+    referralCode: { type: String, unique: true },
+    referredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }
 );
