@@ -1,12 +1,13 @@
 import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import jwt, { SignOptions } from "jsonwebtoken";
 import User from "../models/User";
+import Admin from "../models/Admin";
 
 const generateToken = (id: string, role: string) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET as string, {
-    expiresIn: process.env.JWT_EXPIRES,
+    expiresIn: (process.env.JWT_EXPIRES || "7d") as SignOptions["expiresIn"],
   });
 };
 
@@ -70,6 +71,36 @@ export const loginUser = asyncHandler(async (req: Request, res: Response) => {
     throw new Error("Invalid credentials");
   }
 });
+
+
+export const registerAdmin = async (req: Request, res: Response) => {
+  try {
+    const { username, email, password, role } = req.body;
+
+    // check if email exists
+    const existing = await Admin.findOne({ email });
+    if (existing) {
+      return res.status(400).json({ message: "Email already registered" });
+    }
+
+    // hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const admin = new Admin({
+      username,
+      email,
+      password: hashedPassword,
+      role: role || "admin",
+    });
+
+    await admin.save();
+
+    res.status(201).json({ message: "Admin registered successfully", admin: { id: admin._id, email: admin.email, role: admin.role } });
+  } catch (error) {
+    console.error("Register Admin Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 
 // @desc Get profile
 // @route GET /api/auth/profile

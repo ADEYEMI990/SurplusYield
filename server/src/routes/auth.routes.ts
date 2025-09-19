@@ -1,10 +1,11 @@
 import express from "express";
-import { registerUser, loginUser, getProfile } from "../controllers/auth.controller";
+import { registerUser, loginUser, registerAdmin, getProfile } from "../controllers/auth.controller";
 import { protect, admin } from "../middleware/authMiddleware";
 
 const router = express.Router();
 
 router.post("/register", registerUser);
+router.post("/register-admin", registerAdmin);
 router.post("/login", loginUser);
 router.get("/profile", protect, getProfile);
 
