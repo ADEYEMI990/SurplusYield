@@ -16,6 +16,8 @@ import landingRoutes from "./routes/site/landingRoutes";
 import pageRoutes from "./routes/site/pageRoutes";
 import navigationRoutes from "./routes/site/navigationRoutes";
 import footerRoutes from "./routes/site/footerRoutes";
+import userRoutes from "./routes/userRoutes";
+import "./jobs/roiJob";
 import { notFound, errorHandler } from "./middleware/errorMiddleware";
 
 dotenv.config();
@@ -43,6 +45,7 @@ app.use("/api/site/landing", landingRoutes);
 app.use("/api/site/pages", pageRoutes);
 app.use("/api/site/navigation", navigationRoutes);
 app.use("/api/site/footer", footerRoutes);
+app.use("/api/user", userRoutes);
 
 // Error handling
 app.use(notFound);

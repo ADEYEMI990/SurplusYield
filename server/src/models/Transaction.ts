@@ -21,7 +21,7 @@ const transactionSchema = new Schema<ITransaction>(
     plan: { type: Schema.Types.ObjectId, ref: "Plan" },
     type: {
       type: String,
-      enum: ["deposit", "withdrawal", "investment", "profit"],
+      enum: ["deposit", "withdrawal", "investment", "profit", "roi", "bonus"],
       required: true,
     },
     amount: { type: Number, required: true },
