@@ -8,6 +8,7 @@ export interface IInvestment extends Document {
   initialAmount: number;
   roiRate: number; // e.g., 5% per period
   roiInterval: "daily" | "weekly" | "monthly";
+  roiType: "flat" | "compounded";
   startDate: Date;
   endDate: Date;
   lastCredited: Date;
@@ -22,6 +23,7 @@ const investmentSchema = new Schema<IInvestment>(
     initialAmount: { type: Number, required: true },
     roiRate: { type: Number, required: true },
     roiInterval: { type: String, enum: ["daily", "weekly", "monthly"], default: "daily" },
+    roiType: { type: String, enum: ["flat", "compounded"], default: "flat" },
     startDate: { type: Date, default: Date.now },
     endDate: { type: Date },
     lastCredited: { type: Date },

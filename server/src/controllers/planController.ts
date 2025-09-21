@@ -37,6 +37,18 @@ export const togglePlanStatus = async (req: Request, res: Response) => {
   }
 };
 
+// Get single plan
+export const getPlanById = async (req: Request, res: Response) => {
+  try {
+    const plan = await Plan.findById(req.params.id);
+    if (!plan) return res.status(404).json({ message: "Plan not found" });
+    res.json(plan);
+  } catch (error) {
+    console.error("Error fetching plan:", error);
+    res.status(500).json({ message: "Error fetching plan" });
+  }
+};
+
 // Update a plan (Admin only)
 export const updatePlan = async (req: Request, res: Response) => {
   try {

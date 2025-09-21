@@ -6,6 +6,9 @@ export interface IPlan extends Document {
   description?: string;
   minAmount: number;
   maxAmount: number;
+  roiRate: number; // ROI percentage
+  roiInterval: "daily" | "weekly" | "monthly";
+  roiType: "flat" | "compounded";  // NEW FIELD
   profitPercentage: number; // e.g. 10 means 10%
   durationInDays: number;   // investment length
   isActive: boolean;
@@ -20,6 +23,9 @@ const planSchema = new Schema<IPlan>(
     minAmount: { type: Number, required: true },
     maxAmount: { type: Number, required: true },
     profitPercentage: { type: Number, required: true },
+    roiRate: { type: Number, required: true },
+    roiInterval: { type: String, enum: ["daily", "weekly", "monthly"], required: true },
+    roiType: { type: String, enum: ["flat", "compounded"], default: "flat" }, // NEW FIELD
     durationInDays: { type: Number, required: true },
     isActive: { type: Boolean, default: true },
   },

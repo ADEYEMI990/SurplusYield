@@ -3,31 +3,36 @@ import cron from "node-cron";
 import Investment from "../models/Investment";
 import Wallet from "../models/Wallet";
 import { Transaction } from "../models/Transaction";
+import { Plan } from "../models/Plan";
 
 async function processROI() {
   console.log("Running ROI distribution job...");
 
   const now = new Date();
-  const investments = await Investment.find({ status: "active" });
+  const investments = await Investment.find({ status: "active" }).populate("plan");
 
   for (const inv of investments) {
+    const plan: any = inv.plan;
     let shouldCredit = false;
 
     if (!inv.lastCredited) {
       shouldCredit = true;
     } else {
       const last = new Date(inv.lastCredited);
-      if (inv.roiInterval === "daily" && now.getDate() !== last.getDate()) shouldCredit = true;
-      if (inv.roiInterval === "weekly" && now.getTime() - last.getTime() >= 7 * 24 * 60 * 60 * 1000) shouldCredit = true;
-      if (inv.roiInterval === "monthly" && now.getMonth() !== last.getMonth()) shouldCredit = true;
+      if (plan.roiInterval === "daily" && now.getDate() !== last.getDate()) shouldCredit = true;
+      if (plan.roiInterval === "weekly" && now.getTime() - last.getTime() >= 7 * 24 * 60 * 60 * 1000) shouldCredit = true;
+      if (plan.roiInterval === "monthly" && now.getMonth() !== last.getMonth()) shouldCredit = true;
     }
 
     if (shouldCredit) {
-      // ROI is calculated on current amount (compounded)
-      const roiAmount = (inv.amount * inv.roiRate) / 100;
+      let roiAmount = 0;
 
-      // Update investment principal to include ROI
-      inv.amount += roiAmount;
+      if (plan.roiType === "flat") {
+        roiAmount = (inv.initialAmount * plan.roiRate) / 100; // always original
+      } else {
+        roiAmount = (inv.amount * plan.roiRate) / 100; // compounding
+        inv.amount += roiAmount; // grow principal
+      }
 
       // Update wallet
       const wallet = await Wallet.findOne({ user: inv.user });
@@ -57,12 +62,12 @@ async function processROI() {
       }
       await inv.save();
 
-      console.log(`Compounded ROI ${roiAmount} credited to user ${inv.user}`);
+      console.log(`${plan.roiType} ROI ${roiAmount} credited to user ${inv.user}`);
     }
   }
 }
 
-// Run every day at midnight
+// Run daily at midnight
 cron.schedule("0 0 * * *", processROI);
 
 export default processROI;

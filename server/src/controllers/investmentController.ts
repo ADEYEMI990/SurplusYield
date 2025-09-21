@@ -3,6 +3,7 @@ import { Response } from "express";
 import Wallet from "../models/Wallet";
 import { Transaction } from "../models/Transaction";
 import { Plan } from "../models/Plan";
+import Investment from "../models/Investment";
 
 export const investInPlan = async (req: any, res: Response) => {
   try {
@@ -25,17 +26,38 @@ export const investInPlan = async (req: any, res: Response) => {
     wallet.balance -= amount;
     await wallet.save();
 
-    const txn = await Transaction.create({
+    // Copy plan settings into investment
+    const investment = new Investment({
       user: req.user._id,
-      type: "investment",
-      amount,
       plan: plan._id,
-      status: "active",
+      amount,
+      initialAmount: amount,
+      roiRate: plan.roiRate,
+      roiInterval: plan.roiInterval,
+      roiType: plan.roiType, // ✅ copy roiType
+      startDate: new Date(),
+      endDate: new Date(Date.now() + plan.durationInDays * 24 * 60 * 60 * 1000), // duration in days
     });
 
-    res.json({ message: "Investment successful", transaction: txn, balance: wallet.balance });
+    await investment.save();
+
+    res.status(201).json(investment);
   } catch (error) {
-    console.error("Investment error:", error);
-    res.status(500).json({ message: "Error processing investment" });
+    console.error("Error creating investment:", error);
+    res.status(500).json({ message: "Error creating investment" });
   }
+
+  //   const txn = await Transaction.create({
+  //     user: req.user._id,
+  //     type: "investment",
+  //     amount,
+  //     plan: plan._id,
+  //     status: "active",
+  //   });
+
+  //   res.json({ message: "Investment successful", transaction: txn, balance: wallet.balance });
+  // } catch (error) {
+  //   console.error("Investment error:", error);
+  //   res.status(500).json({ message: "Error processing investment" });
+  // }
 };
