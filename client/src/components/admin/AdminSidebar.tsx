@@ -10,6 +10,7 @@ import {
   List,
   AlignJustify,
   Settings,
+  X,
 } from "lucide-react";
 
 const navItems = [
@@ -24,28 +25,87 @@ const navItems = [
   { label: "Settings", to: "/admin/settings", icon: Settings },
 ];
 
-export default function AdminSidebar() {
+interface SidebarProps {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+}
+export default function AdminSidebar({ open, setOpen }: SidebarProps) {
   return (
-    <aside className="w-64 bg-gray-900 text-white flex flex-col p-4">
-      <h1 className="text-lg font-bold mb-6">Admin Panel</h1>
-      <nav className="flex flex-col gap-2">
-        {navItems.map(({ label, to, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2 rounded-md transition ${
-                isActive
-                  ? "bg-gray-700 text-white"
-                  : "text-gray-400 hover:bg-gray-800 hover:text-white"
-              }`
-            }
-          >
-            <Icon className="w-5 h-5" />
-            {label}
-          </NavLink>
-        ))}
-      </nav>
-    </aside>
+    <>
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex fixed top-0 left-0 h-screen w-64 bg-blue-800 text-white flex-col p-4 overflow-y-auto">
+        <h1 className="text-lg font-bold mb-6">Admin Panel</h1>
+        <nav className="flex flex-col gap-2">
+          {navItems.map(({ label, to, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2 rounded-md transition ${
+                  isActive
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-300 hover:bg-blue-700 hover:text-white"
+                }`
+              }
+            >
+              <Icon className="w-5 h-5" />
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+      </aside>
+
+      {/* Mobile sidebar */}
+      <div
+        className={`fixed inset-0 z-30 md:hidden transition-all duration-300 ease-in-out ${
+          open ? "visible opacity-100" : "invisible opacity-0"
+        }`}
+      >
+        {/* Background overlay */}
+        <div
+          className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${
+            open ? "opacity-100" : "opacity-0"
+          }`}
+          onClick={() => setOpen(false)}
+        />
+
+        {/* Sliding panel */}
+        <aside
+          className={`absolute top-0 left-0 h-full w-64 bg-blue-800 text-white p-4 transform transition-transform duration-300 ease-in-out ${
+            open ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-lg font-bold">Admin Panel</h1>
+            <button
+              onClick={() => setOpen(false)}
+              className="p-2 rounded-md hover:bg-blue-700"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <nav className="flex flex-col gap-2">
+            {navItems.map(({ label, to, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                onClick={() => setOpen(false)}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2 rounded-md transition ${
+                    isActive
+                      ? "bg-blue-600 text-white"
+                      : "text-gray-300 hover:bg-blue-700 hover:text-white"
+                  }`
+                }
+              >
+                <Icon className="w-5 h-5" />
+                {label}
+              </NavLink>
+            ))}
+          </nav>
+        </aside>
+      </div>
+    </>
   );
 }
