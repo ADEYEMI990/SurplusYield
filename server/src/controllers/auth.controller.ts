@@ -77,6 +77,11 @@ export const registerAdmin = async (req: Request, res: Response) => {
   try {
     const { username, email, password, role } = req.body;
 
+    if (!username || !email || !password) {
+    res.status(400);
+    throw new Error("Please include all fields");
+  }
+
     // check if email exists
     const existing = await Admin.findOne({ email });
     if (existing) {
@@ -98,6 +103,39 @@ export const registerAdmin = async (req: Request, res: Response) => {
     res.status(201).json({ message: "Admin registered successfully", admin: { id: admin._id, email: admin.email, role: admin.role } });
   } catch (error) {
     console.error("Register Admin Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const loginAdmin = async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+
+    const admin = await Admin.findOne({ email });
+
+    if (!admin) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    const passwordMatch = await bcrypt.compare(password, admin.password);
+
+    if (!passwordMatch) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+  // generate JWT token (ensure `import jwt from 'jsonwebtoken';` or `import * as jwt from 'jsonwebtoken';` is present)
+    const expiresIn = (process.env.JWT_EXPIRES ?? "7d") as SignOptions['expiresIn'];
+    const payload = { id: admin._id, role: admin.role, email: admin.email };
+    const jwtSecret = process.env.JWT_SECRET as string;
+    // ✅ explicitly declare SignOptions
+    const options: SignOptions = {
+      expiresIn,
+    };
+    const token = jwt.sign(payload, jwtSecret, options);
+
+    res.status(200).json({ message: "Admin logged in successfully", admin: { id: admin._id, email: admin.email, role: admin.role }, token });
+  } catch (error) {
+    console.error("Login Admin Error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };

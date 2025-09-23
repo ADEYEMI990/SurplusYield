@@ -19,7 +19,7 @@ const userSchema = new Schema<IUser>(
     role: { type: String, enum: ["user", "admin"], default: "user" },
     status: { type: String, enum: ["active", "disabled"], default: "active" },
     kycStatus: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
-    referralCode: { type: String, unique: true },
+    referralCode: { type: String },
     referredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }

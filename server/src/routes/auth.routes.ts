@@ -1,5 +1,5 @@
 import express from "express";
-import { registerUser, loginUser, registerAdmin, getProfile } from "../controllers/auth.controller";
+import { registerUser, loginUser, registerAdmin, loginAdmin, getProfile } from "../controllers/auth.controller";
 import { protect, admin } from "../middleware/authMiddleware";
 
 const router = express.Router();
@@ -7,6 +7,7 @@ const router = express.Router();
 router.post("/register", registerUser);
 router.post("/register-admin", registerAdmin);
 router.post("/login", loginUser);
+router.post("/login-admin", loginAdmin);
 router.get("/profile", protect, getProfile);
 
 // Example: only admin can hit this

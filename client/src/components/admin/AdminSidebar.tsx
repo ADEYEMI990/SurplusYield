@@ -80,6 +80,8 @@ export default function AdminSidebar({ open, setOpen }: SidebarProps) {
             <button
               onClick={() => setOpen(false)}
               className="p-2 rounded-md hover:bg-blue-700"
+              title="Close sidebar"
+              aria-label="Close sidebar"
             >
               <X className="w-5 h-5" />
             </button>

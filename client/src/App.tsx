@@ -11,27 +11,34 @@ import SiteFooter from "./pages/admin/SiteFooter";
 import Settings from "./pages/admin/Settings";
 import { queryClient } from "./services/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
+import AdminProtected from "./routes/AdminProtected";
+import AdminLogin from "./pages/admin/AdminLogin";
+
 
 function App() {
   return (
-    <BrowserRouter>
-      <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
         <Routes>
-          {/* Admin routes */}
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="plans" element={<Plans />} />
-            <Route path="transactions" element={<Transactions />} />
-            <Route path="referrals" element={<Referrals />} />
-            <Route path="rewards" element={<Rewards />} />
-            <Route path="site/pages" element={<SitePages />} />
-            <Route path="site/navigation" element={<SiteNavigation />} />
-            <Route path="site/footer" element={<SiteFooter />} />
-            <Route path="settings" element={<Settings />} />
+          {/* Public admin login */}
+          <Route path="/auth/login-admin" element={<AdminLogin />} />
+          {/* Protected Admin routes */}
+          <Route path="/admin" element={<AdminProtected />}>
+            <Route element={<AdminLayout />}>
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="plans" element={<Plans />} />
+              <Route path="transactions" element={<Transactions />} />
+              <Route path="referrals" element={<Referrals />} />
+              <Route path="rewards" element={<Rewards />} />
+              <Route path="site/pages" element={<SitePages />} />
+              <Route path="site/navigation" element={<SiteNavigation />} />
+              <Route path="site/footer" element={<SiteFooter />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
           </Route>
         </Routes>
-      </QueryClientProvider>
-    </BrowserRouter>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
 
