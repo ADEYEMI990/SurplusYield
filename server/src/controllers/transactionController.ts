@@ -1,48 +1,84 @@
 // server/src/controllers/transactionController.ts
 import { Request, Response } from "express";
+import asyncHandler from "express-async-handler";
 import { Transaction } from "../models/Transaction";
 
 // Create transaction (User)
-export const createTransaction = async (req: Request, res: Response) => {
+export const createTransaction = asyncHandler(async (req: Request, res: Response) => {
   try {
-    const tx = new Transaction(req.body);
-    await tx.save();
-    res.status(201).json(tx);
+  if (!req.user) {
+    res.status(401);
+    throw new Error("Not authorized");
+  }
+
+  const { type, amount, plan } = req.body;
+
+  if (!type || !amount) {
+    res.status(400);
+    throw new Error("Please provide type and amount");
+  }
+
+  const transaction = await Transaction.create({
+    user: req.user._id, // ✅ typed now
+    type,
+    amount,
+    plan,
+    status: "pending",
+  });
+
+  res.status(201).json(transaction);
   } catch (error) {
     res.status(400).json({ message: "Error creating transaction", error });
   }
-};
+});
 
 // Get user transactions
-export const getUserTransactions = async (req: any, res: Response) => {
+export const getUserTransactions = asyncHandler(async (req: Request, res: Response) => {
   try {
-    const txs = await Transaction.find({ user: req.user._id }).populate("plan");
-    res.json(txs);
+  if (!req.user) {
+    res.status(401);
+    throw new Error("Not authorized");
+  }
+
+  const transactions = await Transaction.find({ user: req.user._id }).sort({ createdAt: -1 });
+
+  res.json(transactions);
   } catch (error) {
     res.status(500).json({ message: "Error fetching transactions" });
   }
-};
+});
 
 // Get all transactions (Admin only)
-export const getAllTransactions = async (_: Request, res: Response) => {
+export const getAllTransactions = asyncHandler(async (req: Request, res: Response) => {
   try {
-    const txs = await Transaction.find().populate("user plan");
-    res.json(txs);
+  const transactions = await Transaction.find()
+    .populate("user", "name email role")
+    .sort({ createdAt: -1 });
+
+  res.json(transactions); 
   } catch (error) {
     res.status(500).json({ message: "Error fetching transactions" });
   }
-};
+});
 
-export const updateTransactionStatus = async (req: Request, res: Response) => {
+export const updateTransactionStatus = asyncHandler(async (req: Request, res: Response) => {
   try {
-    const tx = await Transaction.findById(req.params.id);
-    if (!tx) return res.status(404).json({ message: "Transaction not found" });
+  const { id } = req.params;
+  const { status } = req.body;
 
-    tx.status = req.body.status; // "completed" | "failed"
-    await tx.save();
+  const transaction = await Transaction.findById(id);
 
-    res.json({ message: `Transaction ${tx.status}`, tx });
+  if (!transaction) {
+    res.status(404);
+    throw new Error("Transaction not found");
+  }
+
+  transaction.status = status || transaction.status;
+
+  const updatedTransaction = await transaction.save();
+
+  res.json(updatedTransaction);
   } catch {
     res.status(500).json({ message: "Error updating transaction" });
   }
-};
+});

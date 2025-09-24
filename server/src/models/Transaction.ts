@@ -35,6 +35,14 @@ const transactionSchema = new Schema<ITransaction>(
   { timestamps: true }
 );
 
+// ✅ Auto-generate reference before validation if missing
+transactionSchema.pre("validate", function (next) {
+  if (!this.reference) {
+    this.reference = `TXN-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  }
+  next();
+})
+
 export const Transaction = mongoose.model<ITransaction>(
   "Transaction",
   transactionSchema
