@@ -37,8 +37,8 @@ export default function AdminReferralPage() {
   if (error) return <p className="text-red-500">{error}</p>;
 
   return (
-    <div className="p-6 space-y-4">
-      <h1 className="text-xl font-bold">Admin Referral Management</h1>
+    <div className="p-4 sm:p-6 space-y-6">
+      <h1 className="text-lg sm:text-xl font-bold text-gray-800">Admin Referral Management</h1>
       <Referral users={users} />
     </div>
   );

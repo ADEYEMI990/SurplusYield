@@ -4,6 +4,7 @@ import clsx from "clsx";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "danger";
+  size?: "sm" | "md" | "lg";   // ✅ added
   loading?: boolean;
 }
 
@@ -13,10 +14,17 @@ const variantClasses: Record<string, string> = {
   danger: "bg-red-600 hover:bg-red-700 text-white",
 };
 
+const sizeClasses: Record<string, string> = {
+  sm: "px-2 py-1 text-sm",
+  md: "px-4 py-2 text-base",
+  lg: "px-6 py-3 text-lg",
+};
+
 export default function Button({
   children,
   className,
   variant = "primary",
+  size = "md",   // ✅ default size
   loading = false,
   disabled,
   ...props
@@ -24,8 +32,9 @@ export default function Button({
   return (
     <button
       className={clsx(
-        "px-4 py-2 rounded-lg font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed",
+        "rounded-lg font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed",
         variantClasses[variant],
+        sizeClasses[size],   // ✅ apply size styles
         className
       )}
       disabled={disabled || loading}

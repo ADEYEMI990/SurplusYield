@@ -15,4 +15,16 @@ API.interceptors.request.use((config) => {
     return config;
 },  (error) => Promise.reject(error));
 
+// Handle expired / invalid tokens
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      useAuthStore.getState().logout(); // clear token from store
+      window.location.href = "auth/login-admin"; // force redirect
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default API;

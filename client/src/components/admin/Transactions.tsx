@@ -107,17 +107,19 @@ export default function AdminTransactions() {
       key: "actions" as keyof Transaction,
       header: "Actions",
       render: (row) => (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {row.status === "pending" && (
             <>
               <Button
                 variant="primary"
+                size="sm"
                 onClick={() => updateStatus(row._id, "completed")}
               >
                 Complete
               </Button>
               <Button
                 variant="danger"
+                size="sm"
                 onClick={() => updateStatus(row._id, "failed")}
               >
                 Fail
@@ -130,9 +132,9 @@ export default function AdminTransactions() {
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Filters */}
-      <div className="flex flex-wrap gap-4 items-end">
+      <div className="flex flex-col sm:flex-row flex-wrap gap-4 items-stretch sm:items-end">
         <Select
           label="Filter by Type"
           value={filters.type}
@@ -163,15 +165,70 @@ export default function AdminTransactions() {
         </Button>
       </div>
 
-      {/* Table */}
       {loading ? (
         <Loader />
       ) : (
         <>
-          <Table<Transaction> data={paginatedData} columns={columns} />
+          {/* Desktop Table */}
+          <div className="hidden sm:block overflow-x-auto">
+            <Table<Transaction> data={paginatedData} columns={columns} />
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="sm:hidden space-y-4">
+            {paginatedData.map((t) => (
+              <div
+                key={t._id}
+                className="p-4 border rounded-lg bg-white shadow-sm space-y-2"
+              >
+                <p className="text-sm">
+                  <span className="font-semibold">Reference:</span> {t.reference}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">User:</span>{" "}
+                  {t.user?.username || "N/A"}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Plan:</span>{" "}
+                  {t.plan?.name || "-"}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Type:</span> {t.type}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Amount:</span> ${t.amount}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Status:</span> {t.status}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Date:</span>{" "}
+                  {new Date(t.createdAt).toLocaleString()}
+                </p>
+                {t.status === "pending" && (
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => updateStatus(t._id, "completed")}
+                    >
+                      Complete
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => updateStatus(t._id, "failed")}
+                    >
+                      Fail
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
 
           {/* Pagination Controls */}
-          <div className="flex justify-between items-center mt-4">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-4">
             <Button
               variant="secondary"
               disabled={page === 1}
@@ -179,12 +236,12 @@ export default function AdminTransactions() {
             >
               Prev
             </Button>
-            <span>
-              Page {page} of {totalPages}
+            <span className="text-sm font-medium">
+              Page {page} of {totalPages || 1}
             </span>
             <Button
               variant="secondary"
-              disabled={page === totalPages}
+              disabled={page === totalPages || totalPages === 0}
               onClick={() => setPage((prev) => prev + 1)}
             >
               Next

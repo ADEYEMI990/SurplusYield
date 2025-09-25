@@ -1,4 +1,3 @@
-// src/components/common/Table.tsx
 import React, { useState } from "react";
 
 export type Column<T> =
@@ -17,12 +16,14 @@ interface TableProps<T> {
   data: T[];
   columns: Column<T>[];
   pageSize?: number;
+  renderRow?: (row: T) => React.ReactNode; // NEW prop
 }
 
 export default function Table<T>({
   data,
   columns,
   pageSize = 10,
+  renderRow,
 }: TableProps<T>) {
   const [page, setPage] = useState(1);
 
@@ -31,35 +32,46 @@ export default function Table<T>({
 
   return (
     <div className="w-full">
-      <div className="overflow-x-auto">
-        <table className="min-w-full border border-gray-200">
-          <thead>
-            <tr>
-              {columns.map((col) => (
-                <th
-                  key={col.key as React.Key}
-                  className="border p-2 text-left bg-gray-50 font-semibold"
-                >
-                  {col.header}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedData.map((row, idx) => (
-              <tr key={idx} className="hover:bg-gray-50">
+      {/* If renderRow is passed, render custom layout instead of table */}
+      {renderRow ? (
+        <div className="space-y-3">
+          {paginatedData.map((row, idx) => (
+            <div key={idx}>{renderRow(row)}</div>
+          ))}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full border border-gray-200">
+            <thead>
+              <tr>
                 {columns.map((col) => (
-                  <td key={col.key as React.Key} className="border p-2">
-                    {"render" in col && col.render
-                      ? col.render(row)
-                      : String((row as Record<string, unknown>)[col.key as string] ?? "")}
-                  </td>
+                  <th
+                    key={col.key as React.Key}
+                    className="border p-2 text-left bg-gray-50 font-semibold"
+                  >
+                    {col.header}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {paginatedData.map((row, idx) => (
+                <tr key={idx} className="hover:bg-gray-50">
+                  {columns.map((col) => (
+                    <td key={col.key as React.Key} className="border p-2">
+                      {"render" in col && col.render
+                        ? col.render(row)
+                        : String(
+                            (row as Record<string, unknown>)[col.key as string] ?? ""
+                          )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Pagination Controls */}
       <div className="flex justify-between items-center mt-3 text-sm">
