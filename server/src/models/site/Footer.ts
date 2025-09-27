@@ -1,3 +1,4 @@
+// src/models/site/Footer.ts
 import { Schema, model, Document } from "mongoose";
 
 export interface IFooter extends Document {

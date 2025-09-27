@@ -1,3 +1,4 @@
+// src/routes/site/footerRoutes.ts
 import { Router } from "express";
 import { createFooterSection, getFooterSections, updateFooterSection, deleteFooterSection } from "../../controllers/site/footerController";
 import { protect, admin } from "../../middleware/authMiddleware";

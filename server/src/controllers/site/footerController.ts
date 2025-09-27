@@ -1,3 +1,4 @@
+// src/controllers/site/footerController.ts
 import { Request, Response } from "express";
 import Footer from "../../models/site/Footer";
 
