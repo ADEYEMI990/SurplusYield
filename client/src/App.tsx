@@ -13,6 +13,8 @@ import { queryClient } from "./services/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import AdminProtected from "./routes/AdminProtected";
 import AdminLogin from "./pages/admin/AdminLogin";
+import LoginUser from "./pages/user/LoginUser";
+import SignupUser from "./pages/user/SignupUser";
 
 
 function App() {
@@ -36,6 +38,10 @@ function App() {
               <Route path="settings" element={<Settings />} />
             </Route>
           </Route>
+
+          {/* User auth */}
+        <Route path="/auth/login" element={<LoginUser />} />
+        <Route path="/auth/register" element={<SignupUser />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

@@ -20,8 +20,14 @@ API.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      useAuthStore.getState().logout(); // clear token from store
-      window.location.href = "auth/login-admin"; // force redirect
+      const { role, logout } = useAuthStore.getState();
+      logout();
+
+      if (role === "admin") {
+        window.location.href = "/auth/login-admin";
+      } else {
+        window.location.href = "/auth/login";
+      }
     }
     return Promise.reject(error);
   }
