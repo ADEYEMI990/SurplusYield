@@ -50,44 +50,18 @@ export const registerUser = asyncHandler(async (req: Request, res: Response) => 
   const session = await mongoose.startSession();
   session.startTransaction();
 
+  
   try {
-    let referredBy: mongoose.Types.ObjectId | undefined;
+    let referredBy: mongoose.Schema.Types.ObjectId | undefined;
+    let referrer: any = null;
 
-    // 🔹 Handle referral if provided
-    if (providedReferral) {
-      const referrer = await User.findOne({ referralCode: providedReferral }).session(session);
-      if (referrer) {
-        referredBy = referrer._id as mongoose.Types.ObjectId;
-
-        // Add referral bonus to referrer
-        const referralBonusAmount = 20;
-        referrer.profitWallet += referralBonusAmount;
-        await referrer.save({ session });
-
-        // Log referral bonus transaction
-        await Transaction.create(
-          [
-            {
-              user: referrer._id,
-              type: "bonus",
-              bonusType: "referral",
-              amount: referralBonusAmount,
-              status: "success",
-            },
-          ],
-          { session }
-        );
-      }
-    }
-
-    // 🔹 Create new user with signup bonus
+    // 🔹 Create the new user first (signup bonus included)
     const user = new User({
       name,
       email,
       password: hashedPassword,
       role: role || "user",
       referralCode,
-      referredBy,
       profitWallet: 20, // signup bonus
     });
 
@@ -107,11 +81,43 @@ export const registerUser = asyncHandler(async (req: Request, res: Response) => 
       { session }
     );
 
-    // ✅ Commit transaction
+    // 🔹 Handle referral AFTER user creation is successful
+    if (providedReferral) {
+      referrer = await User.findOne({ referralCode: providedReferral }).session(session);
+
+      if (referrer) {
+        referredBy = referrer._id as mongoose.Schema.Types.ObjectId;
+        user.referredBy = referredBy;
+
+        // Add referral bonus to referrer
+        const referralBonusAmount = 20;
+        referrer.profitWallet += referralBonusAmount;
+        await referrer.save({ session });
+        await user.save({ session }); // update referredBy in user doc
+
+        // Log referral bonus transaction for referrer
+        await Transaction.create(
+          [
+            {
+              user: referrer._id,
+              type: "bonus",
+              bonusType: "referral",
+              amount: referralBonusAmount,
+              status: "success",
+            },
+          ],
+          { session }
+        );
+      }
+    }
+
+    // ✅ Commit transaction if everything succeeded
     await session.commitTransaction();
     session.endSession();
 
-    // Send response
+    console.log("USER FROM DB:", user);
+
+    // Build clean response
     const responseData = {
       _id: user._id,
       id: user._id,
@@ -124,7 +130,6 @@ export const registerUser = asyncHandler(async (req: Request, res: Response) => 
       token: generateToken(user.id, user.role),
     };
 
-    // 🔥 Debug log before response
     console.log("REGISTER RESPONSE:", responseData);
 
     res.status(201).json({
