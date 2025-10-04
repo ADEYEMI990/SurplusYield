@@ -1,8 +1,10 @@
 // server/src/models/Transaction.ts
 import mongoose, { Document, Schema } from "mongoose";
 
-export type TransactionType = "deposit" | "withdrawal" | "investment" | "profit";
-export type TransactionStatus = "pending" | "completed" | "failed";
+export type TransactionType = "deposit" | "withdrawal" | "investment" | "profit" | "roi" | "bonus";
+export type TransactionStatus = "pending" | "success" | "failed";
+
+export type BonusType = "referral" | "deposit" | "investment" | "signup";
 
 export interface ITransaction extends Document {
   user: mongoose.Schema.Types.ObjectId;
@@ -13,6 +15,7 @@ export interface ITransaction extends Document {
   reference: string; // unique transaction reference
   createdAt: Date;
   updatedAt: Date;
+  bonusType?: BonusType;
 }
 
 const transactionSchema = new Schema<ITransaction>(
@@ -24,10 +27,17 @@ const transactionSchema = new Schema<ITransaction>(
       enum: ["deposit", "withdrawal", "investment", "profit", "roi", "bonus"],
       required: true,
     },
+    bonusType: {
+      type: String,
+      enum: ["referral", "deposit", "investment", "signup"],
+      required: function (this: ITransaction) {
+        return this.type === "bonus"; // ✅ only required if type = bonus
+      },
+    },
     amount: { type: Number, required: true },
     status: {
       type: String,
-      enum: ["pending", "completed", "failed"],
+      enum: ["pending", "success", "failed"],
       default: "pending",
     },
     reference: { type: String, required: true, unique: true },
@@ -38,7 +48,14 @@ const transactionSchema = new Schema<ITransaction>(
 // ✅ Auto-generate reference before validation if missing
 transactionSchema.pre("validate", function (next) {
   if (!this.reference) {
-    this.reference = `TXN-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const base = `TXN-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    if (this.bonusType === "signup") {
+      this.reference = `${base}-SIGNUP`;
+    } else if (this.bonusType === "referral") {
+      this.reference = `${base}-REFERRAL`;
+    } else {
+      this.reference = base;
+    }
   }
   next();
 })

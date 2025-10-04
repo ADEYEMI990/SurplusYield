@@ -2,6 +2,9 @@
 import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
 import { Transaction } from "../models/Transaction";
+import { applyTransactionToWalletAtomic } from "../utils/walletUtils";
+import mongoose from "mongoose";
+import User from "../models/User";
 
 // Create transaction (User)
 export const createTransaction = asyncHandler(async (req: Request, res: Response) => {
@@ -11,7 +14,12 @@ export const createTransaction = asyncHandler(async (req: Request, res: Response
     throw new Error("Not authorized");
   }
 
-  const { type, amount, plan } = req.body;
+  const { type, amount, plan, bonusType } = req.body;
+
+  if (type === "bonus" && !bonusType) {
+    res.status(400);
+    throw new Error("Bonus transactions must include bonusType");
+  }
 
   if (!type || !amount) {
     res.status(400);
@@ -23,6 +31,7 @@ export const createTransaction = asyncHandler(async (req: Request, res: Response
     type,
     amount,
     plan,
+    bonusType: type === "bonus" ? bonusType : undefined,
     status: "pending",
   });
 
@@ -61,24 +70,136 @@ export const getAllTransactions = asyncHandler(async (req: Request, res: Respons
   }
 });
 
+/**
+ * Update transaction status (admin).
+ * If status becomes "completed" (and wasn't completed already), update user wallets in same DB transaction.
+ */
 export const updateTransactionStatus = asyncHandler(async (req: Request, res: Response) => {
-  try {
   const { id } = req.params;
   const { status } = req.body;
 
-  const transaction = await Transaction.findById(id);
+  if (!["pending", "success", "failed"].includes(status)) {
+    res.status(400);
+    throw new Error("Invalid status");
+  }
 
-  if (!transaction) {
+  // Start a mongoose session
+  const session = await mongoose.startSession();
+
+  try {
+    let updatedTransaction;
+
+    await session.withTransaction(async () => {
+      // Load transaction inside session (for correct transactional view)
+      const txn = await Transaction.findById(id).session(session);
+      if (!txn) {
+        // Throwing will abort the transaction
+        throw new Error("Transaction not found");
+      }
+
+      const prevStatus = txn.status;
+
+      // Update status
+      txn.status = status;
+      await txn.save({ session });
+
+      // Only apply wallet changes when transitioning to success from non-success
+      if (prevStatus !== "success" && status === "success") {
+        // Apply wallet update atomically (uses $inc under the hood)
+        await applyTransactionToWalletAtomic(txn, session);
+      }
+
+      // If transaction was previously completed and is being changed away from completed,
+      // you might want to reverse the wallet change — handle that if relevant for your app.
+      // Current code does NOT reverse previously applied completed transactions.
+
+      // Return updated txn for response
+      updatedTransaction = txn;
+    }, {
+      // Recommended options:
+      readPreference: "primary",
+      readConcern: { level: "local" },
+      writeConcern: { w: "majority" },
+    });
+
+    // session.withTransaction resolved without throwing => commit done
+    res.json(updatedTransaction);
+  } catch (err: unknown) {
+    // on error, transaction aborted automatically
+    console.error("Error updating transaction status with session:", err);
+    res.status(500).json({ message: (err instanceof Error) ? err.message : "Error updating transaction" });
+  } finally {
+    session.endSession();
+  }
+});
+
+export const getUserBalances = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    res.status(401);
+    throw new Error("Not authorized");
+  }
+
+  const user = await User.findById(req.user._id).select("mainWallet profitWallet");
+  if (!user) {
     res.status(404);
-    throw new Error("Transaction not found");
+    throw new Error("User not found");
   }
 
-  transaction.status = status || transaction.status;
+  res.json({
+    mainWallet: user.mainWallet,
+    profitWallet: user.profitWallet,
+    accountBalance: user.mainWallet + user.profitWallet,
+  });
+});
 
-  const updatedTransaction = await transaction.save();
-
-  res.json(updatedTransaction);
-  } catch {
-    res.status(500).json({ message: "Error updating transaction" });
+// server/src/controllers/transactionController.ts
+export const getUserDashboardStats = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    res.status(401);
+    throw new Error("Not authorized");
   }
+
+  const userId = req.user._id;
+
+  const transactions = await Transaction.find({ user: userId, status: "success" });
+
+  // Aggregate totals
+  const totals: Record<string, number> = {
+    deposit: 0,
+    investment: 0,
+    profit: 0,
+    withdrawal: 0,
+    roi: 0,
+  };
+
+  let referralBonus = 0;
+  let depositBonus = 0;
+  let investmentBonus = 0;
+  let signupBonus = 0; // ✅ new
+
+  transactions.forEach((txn) => {
+    if (txn.type === "bonus") {
+      if (txn.bonusType === "referral") referralBonus += txn.amount;
+      if (txn.bonusType === "deposit") depositBonus += txn.amount;
+      if (txn.bonusType === "investment") investmentBonus += txn.amount;
+      if (txn.bonusType === "signup") signupBonus += txn.amount; // ✅ new
+    } else {
+      totals[txn.type] = (totals[txn.type] || 0) + txn.amount;
+    }
+  });
+
+  const referrals = await User.countDocuments({ referredBy: userId });
+
+  res.json({
+    allTransactions: transactions.length,
+    totalDeposit: totals.deposit,
+    totalInvestment: totals.investment,
+    totalProfit: totals.profit,
+    totalWithdraw: totals.withdrawal,
+    referralBonus,
+    depositBonus,
+    investmentBonus,
+    signupBonus, // ✅ include in response
+    totalReferrals: referrals,
+  });
 });

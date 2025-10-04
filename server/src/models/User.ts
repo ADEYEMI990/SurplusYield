@@ -1,3 +1,4 @@
+// server/src/models/User.ts
 import mongoose, { Document, Schema } from "mongoose";
 
 export interface IUser extends Document {
@@ -9,6 +10,8 @@ export interface IUser extends Document {
   kycStatus?: "pending" | "approved" | "rejected";
   referralCode?: string;
   referredBy?: mongoose.Schema.Types.ObjectId;
+  mainWallet: number;
+  profitWallet: number;
 }
 
 const userSchema = new Schema<IUser>(
@@ -19,8 +22,10 @@ const userSchema = new Schema<IUser>(
     role: { type: String, enum: ["user", "admin"], default: "user" },
     status: { type: String, enum: ["active", "disabled"], default: "active" },
     kycStatus: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
-    referralCode: { type: String },
+    referralCode: { type: String, unique: true },
     referredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    mainWallet: { type: Number, default: 0 },
+    profitWallet: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

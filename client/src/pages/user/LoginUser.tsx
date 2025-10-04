@@ -29,6 +29,7 @@ export default function LoginUser() {
     try {
       const { data } = await API.post("/auth/login", { email, password });
       setAuth({ user: data.user, token: data.token, role: "user" });
+      console.log("LOGIN RESPONSE DATA:", data);
       toast.success("Login successful ✅");
       navigate("/user/dashboard");
     } catch (err: unknown) {

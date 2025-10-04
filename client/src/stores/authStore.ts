@@ -1,12 +1,13 @@
 // client/src/stores/authStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type{ User } from "../types/User";
 
 interface AuthState {
-  user: unknown | null;
+  user: User | null;
   token: string | null;
   role: "admin" | "user" | null;
-  setAuth: (payload: { user: unknown; token: string; role: "admin" | "user" }) => void;
+  setAuth: (payload: { user: User; token: string; role: "admin" | "user" }) => void;
   logout: () => void;
 }
 
@@ -16,12 +17,23 @@ const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       role: null,
-      setAuth: ({ user, token, role }) =>
-        set({ user, token, role }),
+      setAuth: ({ user, token, role }) => {
+        console.log("🔑 Setting auth state:", { user, token, role }); // debug
+        set({ user, token, role });
+      },
       logout: () => set({ user: null, token: null, role: null }),
     }),
     {
-      name: "auth-storage", // key in localStorage
+      name: "auth-storage", // localStorage key
+      partialize: (state) => ({
+        user: state.user ? {
+          ...state.user,
+          referralCode: state.user.referralCode || "",
+          referralUrl: state.user.referralUrl || "",
+        } : null,
+        token: state.token,
+        role: state.role,
+      }),
     }
   )
 );

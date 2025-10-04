@@ -3,7 +3,7 @@ import React from "react";
 import clsx from "clsx";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "danger";
+  variant?: "primary" | "secondary" | "danger" | "outline";
   size?: "sm" | "md" | "lg";   // ✅ added
   loading?: boolean;
 }
@@ -12,6 +12,7 @@ const variantClasses: Record<string, string> = {
   primary: "bg-blue-600 hover:bg-blue-700 text-white",
   secondary: "bg-gray-200 hover:bg-gray-300 text-gray-800",
   danger: "bg-red-600 hover:bg-red-700 text-white",
+  outline: "border border-gray-400 text-gray-800 hover:bg-gray-100",
 };
 
 const sizeClasses: Record<string, string> = {

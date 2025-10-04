@@ -4,6 +4,8 @@ import bcrypt from "bcryptjs";
 import jwt, { SignOptions } from "jsonwebtoken";
 import User from "../models/User";
 import Admin from "../models/Admin";
+import { Transaction } from "../models/Transaction";
+import mongoose from "mongoose";
 
 const generateToken = (id: string, role: string) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET as string, {
@@ -11,10 +13,17 @@ const generateToken = (id: string, role: string) => {
   });
 };
 
+function generateReferralCode(name: string, email: string): string {
+  const base = name.split(" ")[0].toUpperCase(); // take first name
+  const emailPrefix = email.split("@")[0].toUpperCase(); // before @
+  const randomNum = Math.floor(100 + Math.random() * 900); // 3-digit number
+  return `${base}${randomNum}`;
+}
+
 // @desc Register user
 // @route POST /api/auth/register
 export const registerUser = asyncHandler(async (req: Request, res: Response) => {
-  const { name, email, password, role } = req.body;
+  const { name, email, password, role, referralCode: providedReferral } = req.body;
 
   if (!name || !email || !password) {
     res.status(400);
@@ -27,29 +36,111 @@ export const registerUser = asyncHandler(async (req: Request, res: Response) => 
     throw new Error("User already exists");
   }
 
+  // Hash password
   const salt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(password, salt);
 
-  const user = await User.create({
-    name,
-    email,
-    password: hashedPassword,
-    role: role || "user",
-  });
+  // Generate unique referral code
+  let referralCode = generateReferralCode(name, email);
+  while (await User.findOne({ referralCode })) {
+    referralCode = generateReferralCode(name, email);
+  }
 
-  if (user) {
-    res.status(201).json({
-      _id: user.id,
+  // Start transaction session
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    let referredBy: mongoose.Types.ObjectId | undefined;
+
+    // 🔹 Handle referral if provided
+    if (providedReferral) {
+      const referrer = await User.findOne({ referralCode: providedReferral }).session(session);
+      if (referrer) {
+        referredBy = referrer._id as mongoose.Types.ObjectId;
+
+        // Add referral bonus to referrer
+        const referralBonusAmount = 20;
+        referrer.profitWallet += referralBonusAmount;
+        await referrer.save({ session });
+
+        // Log referral bonus transaction
+        await Transaction.create(
+          [
+            {
+              user: referrer._id,
+              type: "bonus",
+              bonusType: "referral",
+              amount: referralBonusAmount,
+              status: "success",
+            },
+          ],
+          { session }
+        );
+      }
+    }
+
+    // 🔹 Create new user with signup bonus
+    const user = new User({
+      name,
+      email,
+      password: hashedPassword,
+      role: role || "user",
+      referralCode,
+      referredBy,
+      profitWallet: 20, // signup bonus
+    });
+
+    await user.save({ session });
+
+    // Log signup bonus transaction
+    await Transaction.create(
+      [
+        {
+          user: user._id,
+          type: "bonus",
+          bonusType: "signup",
+          amount: 20,
+          status: "success",
+        },
+      ],
+      { session }
+    );
+
+    // ✅ Commit transaction
+    await session.commitTransaction();
+    session.endSession();
+
+    // Send response
+    const responseData = {
+      _id: user._id,
+      id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
+      referralCode: user.referralCode ?? "",
+      referredBy: user.referredBy,
+      referralUrl: `${process.env.FRONTEND_URL}/auth/register?ref=${user.referralCode}`,
       token: generateToken(user.id, user.role),
+    };
+
+    // 🔥 Debug log before response
+    console.log("REGISTER RESPONSE:", responseData);
+
+    res.status(201).json({
+      user: responseData,
+      token: responseData.token,
     });
-  } else {
-    res.status(400);
-    throw new Error("Invalid user data");
+  } catch (err) {
+    // ❌ Rollback on error
+    await session.abortTransaction();
+    session.endSession();
+    console.error("Register User Error:", err);
+    res.status(500);
+    throw new Error("Server error during registration");
   }
 });
+
 
 // @desc Login user
 // @route POST /api/auth/login
@@ -59,12 +150,27 @@ export const loginUser = asyncHandler(async (req: Request, res: Response) => {
   const user = await User.findOne({ email });
 
   if (user && (await bcrypt.compare(password, user.password))) {
-    res.json({
-      _id: user.id,
+    console.log("USER FROM DB:", user);
+
+    const referralUrl = `${process.env.FRONTEND_URL}/auth/register?ref=${user.referralCode}`;
+    const responseData = {
+      _id: user._id,
+      id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
+      referralCode: user.referralCode ?? "",
+      referredBy: user.referredBy,
+      referralUrl,
       token: generateToken(user.id, user.role),
+    };
+
+    // 🔥 Debug log before response
+    console.log("LOGIN RESPONSE:", responseData);
+
+    res.status(201).json({
+      user: responseData,
+      token: responseData.token,
     });
   } else {
     res.status(401);
@@ -72,15 +178,14 @@ export const loginUser = asyncHandler(async (req: Request, res: Response) => {
   }
 });
 
-
 export const registerAdmin = async (req: Request, res: Response) => {
   try {
     const { username, email, password, role } = req.body;
 
     if (!username || !email || !password) {
-    res.status(400);
-    throw new Error("Please include all fields");
-  }
+      res.status(400);
+      throw new Error("Please include all fields");
+    }
 
     // check if email exists
     const existing = await Admin.findOne({ email });
@@ -100,7 +205,12 @@ export const registerAdmin = async (req: Request, res: Response) => {
 
     await admin.save();
 
-    res.status(201).json({ message: "Admin registered successfully", admin: { id: admin._id, email: admin.email, role: admin.role } });
+    res
+      .status(201)
+      .json({
+        message: "Admin registered successfully",
+        admin: { id: admin._id, email: admin.email, role: admin.role },
+      });
   } catch (error) {
     console.error("Register Admin Error:", error);
     res.status(500).json({ message: "Server error" });
@@ -123,8 +233,9 @@ export const loginAdmin = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-  // generate JWT token (ensure `import jwt from 'jsonwebtoken';` or `import * as jwt from 'jsonwebtoken';` is present)
-    const expiresIn = (process.env.JWT_EXPIRES ?? "7d") as SignOptions['expiresIn'];
+    // generate JWT token (ensure `import jwt from 'jsonwebtoken';` or `import * as jwt from 'jsonwebtoken';` is present)
+    const expiresIn = (process.env.JWT_EXPIRES ??
+      "7d") as SignOptions["expiresIn"];
     const payload = { id: admin._id, role: admin.role, email: admin.email };
     const jwtSecret = process.env.JWT_SECRET as string;
     // ✅ explicitly declare SignOptions
@@ -133,7 +244,13 @@ export const loginAdmin = async (req: Request, res: Response) => {
     };
     const token = jwt.sign(payload, jwtSecret, options);
 
-    res.status(200).json({ message: "Admin logged in successfully", admin: { id: admin._id, email: admin.email, role: admin.role }, token });
+    res
+      .status(200)
+      .json({
+        message: "Admin logged in successfully",
+        admin: { id: admin._id, email: admin.email, role: admin.role },
+        token,
+      });
   } catch (error) {
     console.error("Login Admin Error:", error);
     res.status(500).json({ message: "Server error" });

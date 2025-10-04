@@ -27,6 +27,8 @@ export default function SignupUser() {
 
   const setAuth = useAuthStore((s) => s.setAuth);
   const navigate = useNavigate();
+  const [referralCode, setReferralCode] = useState("");
+  
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +51,7 @@ export default function SignupUser() {
         name: fullName,
         email,
         password,
+        referralCode,
       });
       setAuth({ user: data.user, token: data.token, role: "user" });
       toast.success("Signup successful 🎉");
@@ -147,6 +150,15 @@ export default function SignupUser() {
                 {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
+
+            <Input
+              type="text"
+              label="Referral Code (optional)"
+              placeholder="Enter referral code"
+              value={referralCode}
+              onChange={(e) => setReferralCode(e.target.value)}
+              className="w-full"
+            />
 
             <Button type="submit" className="w-full" loading={loading}>
               Sign Up

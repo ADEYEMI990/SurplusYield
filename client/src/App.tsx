@@ -15,7 +15,9 @@ import AdminProtected from "./routes/AdminProtected";
 import AdminLogin from "./pages/admin/AdminLogin";
 import LoginUser from "./pages/user/LoginUser";
 import SignupUser from "./pages/user/SignupUser";
-
+import UserLayout from "./layouts/UserLayout";
+import UserProtected from "./routes/UserProtected";
+import UserDashboardPage from "./pages/user/UserDashboard";
 
 function App() {
   return (
@@ -40,8 +42,14 @@ function App() {
           </Route>
 
           {/* User auth */}
-        <Route path="/auth/login" element={<LoginUser />} />
-        <Route path="/auth/register" element={<SignupUser />} />
+          <Route path="/auth/login" element={<LoginUser />} />
+          <Route path="/auth/register" element={<SignupUser />} />
+          {/* Protected User routes */}
+          <Route path="/user" element={<UserProtected />}>
+            <Route element={<UserLayout />}>
+              <Route path="dashboard" element={<UserDashboardPage />} />
+            </Route>
+          </Route>
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>
