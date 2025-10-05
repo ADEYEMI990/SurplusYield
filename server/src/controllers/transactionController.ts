@@ -190,11 +190,18 @@ export const getUserDashboardStats = asyncHandler(async (req: Request, res: Resp
 
   const referrals = await User.countDocuments({ referredBy: userId });
 
+  const totalProfit =
+    totals.profit +
+    referralBonus +
+    depositBonus +
+    investmentBonus +
+    signupBonus;
+
   res.json({
     allTransactions: transactions.length,
     totalDeposit: totals.deposit,
     totalInvestment: totals.investment,
-    totalProfit: totals.profit,
+    totalProfit,
     totalWithdraw: totals.withdrawal,
     referralBonus,
     depositBonus,
