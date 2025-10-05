@@ -18,6 +18,7 @@ import SignupUser from "./pages/user/SignupUser";
 import UserLayout from "./layouts/UserLayout";
 import UserProtected from "./routes/UserProtected";
 import UserDashboardPage from "./pages/user/UserDashboard";
+import DepositPage from "./components/user/Deposit";
 
 function App() {
   return (
@@ -48,6 +49,7 @@ function App() {
           <Route path="/user" element={<UserProtected />}>
             <Route element={<UserLayout />}>
               <Route path="dashboard" element={<UserDashboardPage />} />
+              <Route path="deposit" element={<DepositPage />} />
             </Route>
           </Route>
         </Routes>

@@ -16,6 +16,8 @@ export interface ITransaction extends Document {
   createdAt: Date;
   updatedAt: Date;
   bonusType?: BonusType;
+  receipt?: string; // URL or path to receipt image
+  currency?: string;
 }
 
 const transactionSchema = new Schema<ITransaction>(
@@ -41,6 +43,8 @@ const transactionSchema = new Schema<ITransaction>(
       default: "pending",
     },
     reference: { type: String, required: true, unique: true },
+    receipt: { type: String },
+    currency: { type: String, default: "USD" },
   },
   { timestamps: true }
 );

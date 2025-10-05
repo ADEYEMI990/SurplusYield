@@ -113,9 +113,9 @@ export default function AdminTransactions() {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => updateStatus(row._id, "completed")}
+                onClick={() => updateStatus(row._id, "success")}
               >
-                Complete
+                success
               </Button>
               <Button
                 variant="danger"

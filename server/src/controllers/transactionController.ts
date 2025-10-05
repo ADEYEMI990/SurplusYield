@@ -5,6 +5,8 @@ import { Transaction } from "../models/Transaction";
 import { applyTransactionToWalletAtomic } from "../utils/walletUtils";
 import mongoose from "mongoose";
 import User from "../models/User";
+import path from "path";
+import fs from "fs";
 
 // Create transaction (User)
 export const createTransaction = asyncHandler(async (req: Request, res: Response) => {
@@ -14,7 +16,7 @@ export const createTransaction = asyncHandler(async (req: Request, res: Response
     throw new Error("Not authorized");
   }
 
-  const { type, amount, plan, bonusType } = req.body;
+  const { type, amount, plan, bonusType, status, reference } = req.body;
 
   if (type === "bonus" && !bonusType) {
     res.status(400);
@@ -26,16 +28,44 @@ export const createTransaction = asyncHandler(async (req: Request, res: Response
     throw new Error("Please provide type and amount");
   }
 
+  // Handle optional receipt upload
+  let receiptPath = "";
+  if (req.file) {
+    const uploadDir = path.join(__dirname, "../../uploads/receipts");
+    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+    const fileName = `${Date.now()}_${req.file.originalname}`;
+    const filePath = path.join(uploadDir, fileName);
+    fs.writeFileSync(filePath, req.file.buffer);
+    receiptPath = `/uploads/receipts/${fileName}`;
+  }
+
   const transaction = await Transaction.create({
     user: req.user._id, // ✅ typed now
     type,
     amount,
     plan,
     bonusType: type === "bonus" ? bonusType : undefined,
-    status: "pending",
+    status: status || "pending",
+    receipt: receiptPath,
   });
 
-  res.status(201).json(transaction);
+    // ✅ Only update wallet for SUCCESS transactions
+  if (status === "success") {
+    const user = await User.findById(req.user._id);
+    if (user) {
+      if (type === "deposit" || type === "bonus") {
+        user.mainWallet += Number(amount);
+      } else if (type === "withdrawal") {
+        user.mainWallet -= Number(amount);
+      }
+      await user.save();
+    }
+  }
+
+  res.status(201).json({
+    success: true,
+    transaction,
+  });
   } catch (error) {
     res.status(400).json({ message: "Error creating transaction", error });
   }
@@ -83,51 +113,85 @@ export const updateTransactionStatus = asyncHandler(async (req: Request, res: Re
     throw new Error("Invalid status");
   }
 
-  // Start a mongoose session
+  // Start session
   const session = await mongoose.startSession();
 
   try {
     let updatedTransaction;
 
-    await session.withTransaction(async () => {
-      // Load transaction inside session (for correct transactional view)
-      const txn = await Transaction.findById(id).session(session);
-      if (!txn) {
-        // Throwing will abort the transaction
-        throw new Error("Transaction not found");
+    await session.withTransaction(
+      async () => {
+        // Fetch transaction in session
+        const txn = await Transaction.findById(id).session(session);
+        if (!txn) {
+          throw new Error("Transaction not found");
+        }
+
+        const prevStatus = txn.status;
+
+        // Update status
+        txn.status = status;
+        await txn.save({ session });
+
+        // Apply wallet update only on first-time success
+        if (prevStatus !== "success" && status === "success") {
+          // Apply main wallet logic
+          await applyTransactionToWalletAtomic(txn, session);
+
+          // ✅ If deposit transaction → trigger deposit bonus
+          if (txn.type === "deposit") {
+            const user = await User.findById(txn.user).session(session);
+            if (user) {
+              const bonusAmount = txn.amount * 0.1; // 10% bonus
+
+              // Update profit wallet
+              user.profitWallet += bonusAmount;
+              await user.save({ session });
+
+              // Create bonus transaction
+              await Transaction.create(
+                [
+                  {
+                    user: user._id,
+                    type: "bonus",
+                    bonusType: "deposit",
+                    amount: bonusAmount,
+                    status: "success",
+                    currency: txn.currency || "USD",
+                  },
+                ],
+                { session }
+              );
+
+              console.log(
+                `✅ Deposit bonus of $${bonusAmount.toFixed(
+                  2
+                )} created for ${user.email}`
+              );
+            }
+          }
+        }
+
+        // Return updated transaction
+        updatedTransaction = txn;
+      },
+      {
+        readPreference: "primary",
+        readConcern: { level: "local" },
+        writeConcern: { w: "majority" },
       }
+    );
 
-      const prevStatus = txn.status;
-
-      // Update status
-      txn.status = status;
-      await txn.save({ session });
-
-      // Only apply wallet changes when transitioning to success from non-success
-      if (prevStatus !== "success" && status === "success") {
-        // Apply wallet update atomically (uses $inc under the hood)
-        await applyTransactionToWalletAtomic(txn, session);
-      }
-
-      // If transaction was previously completed and is being changed away from completed,
-      // you might want to reverse the wallet change — handle that if relevant for your app.
-      // Current code does NOT reverse previously applied completed transactions.
-
-      // Return updated txn for response
-      updatedTransaction = txn;
-    }, {
-      // Recommended options:
-      readPreference: "primary",
-      readConcern: { level: "local" },
-      writeConcern: { w: "majority" },
-    });
-
-    // session.withTransaction resolved without throwing => commit done
+    // ✅ Transaction committed successfully
     res.json(updatedTransaction);
   } catch (err: unknown) {
-    // on error, transaction aborted automatically
     console.error("Error updating transaction status with session:", err);
-    res.status(500).json({ message: (err instanceof Error) ? err.message : "Error updating transaction" });
+    res.status(500).json({
+      message:
+        err instanceof Error
+          ? err.message
+          : "Error updating transaction status",
+    });
   } finally {
     session.endSession();
   }
