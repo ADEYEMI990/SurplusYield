@@ -19,6 +19,7 @@ import footerRoutes from "./routes/site/footerRoutes";
 import userRoutes from "./routes/userRoutes";
 import "./jobs/roiJob";
 import { notFound, errorHandler } from "./middleware/errorMiddleware";
+import path from "path";
 
 dotenv.config();
 connectDB();
@@ -31,6 +32,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 app.use(helmet());
 app.use(morgan("dev"));
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Routes
 app.use("/api/auth", authRoutes);

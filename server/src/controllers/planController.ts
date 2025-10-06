@@ -1,11 +1,14 @@
 // server/src/controllers/planController.ts
 import { Request, Response } from "express";
 import { Plan } from "../models/Plan";
+import path from "path";
+import fs from "fs";
 
 // Create a plan (Admin only)
 export const createPlan = async (req: Request, res: Response) => {
   try {
-    const plan = new Plan(req.body);
+    const icon = req.file ? `/uploads/${req.file.filename}` : undefined;
+    const plan = new Plan({ ...req.body, icon });
     await plan.save();
     res.status(201).json(plan);
   } catch (error) {
@@ -29,9 +32,9 @@ export const togglePlanStatus = async (req: Request, res: Response) => {
     const plan = await Plan.findById(req.params.id);
     if (!plan) return res.status(404).json({ message: "Plan not found" });
 
-    plan.isActive = !plan.isActive;
+    plan.status = plan.status === "active" ? "deactivated" : "active";
     await plan.save();
-    res.json({ message: `Plan ${plan.isActive ? "activated" : "deactivated"}` });
+    res.json({ message: `Plan ${plan.status === "active" ? "activated" : "deactivated"}` });
   } catch {
     res.status(500).json({ message: "Error toggling plan" });
   }
@@ -52,11 +55,14 @@ export const getPlanById = async (req: Request, res: Response) => {
 // Update a plan (Admin only)
 export const updatePlan = async (req: Request, res: Response) => {
   try {
-    const plan = await Plan.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const icon = req.file ? `/uploads/${req.file.filename}` : undefined;
+    const updateData = icon ? { ...req.body, icon } : req.body;
+
+    const plan = await Plan.findByIdAndUpdate(req.params.id, updateData, { new: true });
     if (!plan) return res.status(404).json({ message: "Plan not found" });
     res.json(plan);
   } catch (error) {
-    res.status(400).json({ message: "Error updating plan" });
+    res.status(400).json({ message: "Error updating plan", error });
   }
 };
 

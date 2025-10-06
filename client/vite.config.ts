@@ -12,6 +12,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      "/uploads": {
+        target: "http://localhost:5000", // serve uploaded images from backend
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 })

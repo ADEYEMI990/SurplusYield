@@ -1,118 +1,192 @@
-// src/pages/admin/Plans.tsx
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "react-toastify";
-import { planService } from "../../services/planService";
-import type { Plan } from "../../services/planService";
+// client/src/pages/admin/Plans.tsx
+import { useEffect, useState } from "react";
+import API from "../../lib/api";
+import Button from "../../components/common/Button";
+import Table from "../../components/common/Table";
 import PlanForm from "../../components/admin/PlanForm";
+import { toast } from "react-toastify";
+import type { Plan } from "../../types/plan";
 
-export default function Plans() {
-  const queryClient = useQueryClient();
+export default function PlansPage() {
+  const [plans, setPlans] = useState<Plan[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [editData, setEditData] = useState<Plan | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
 
-  const { data: plans, isLoading, error } = useQuery({
-    queryKey: ["plans"],
-    queryFn: planService.getPlans,
-  });
+  const fetchPlans = async () => {
+    try {
+      const { data } = await API.get("/plans");
+      setPlans(data);
+    } catch {
+      toast.error("Error loading plans");
+    }
+  };
 
-  if (error) {
-    toast.error("Failed to load plans");
-  }
+  useEffect(() => {
+    fetchPlans();
+  }, []);
 
-  const createMutation = useMutation({
-    mutationFn: planService.createPlan,
-    onSuccess: () => {
-      toast.success("Plan created successfully");
-      queryClient.invalidateQueries({ queryKey: ["plans"] });
-      setShowForm(false); // close form after submit
-    },
-    onError: () => toast.error("Failed to create plan"),
-  });
+  const handleEdit = (plan: Plan) => {
+    setEditData(plan);
+    setShowForm(true);
+  };
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: Plan }) =>
-      planService.updatePlan(id, payload),
-    onSuccess: () => {
-      toast.success("Plan updated successfully");
-      queryClient.invalidateQueries({ queryKey: ["plans"] });
-    },
-    onError: () => toast.error("Failed to update plan"),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: planService.deletePlan,
-    onSuccess: () => {
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this plan?")) return;
+    try {
+      await API.delete(`/plans/${id}`);
       toast.success("Plan deleted successfully");
-      queryClient.invalidateQueries({ queryKey: ["plans"] });
-    },
-    onError: () => toast.error("Failed to delete plan"),
-  });
+      fetchPlans();
+    } catch {
+      toast.error("Error deleting plan");
+    }
+  };
 
-  if (isLoading) return <p className="text-center py-4">Loading...</p>;
+  const handleToggleStatus = async (plan: Plan) => {
+    if (!plan._id) return;
+    const newStatus = plan.status === "active" ? "deactivated" : "active";
+    setLoadingId(plan._id);
+
+    try {
+      await API.put(`/plans/${plan._id}`, { status: newStatus });
+      toast.success(`Plan ${newStatus === "active" ? "activated" : "deactivated"} successfully`);
+      fetchPlans();
+    } catch {
+      toast.error("Error updating plan status");
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  const handleSuccess = () => {
+    setShowForm(false);
+    setEditData(null);
+    fetchPlans();
+  };
 
   return (
-    <div className="p-4 sm:p-6">
-      <h1 className="text-xl sm:text-2xl font-bold mb-6 text-center sm:text-left">
-        Manage Plans
-      </h1>
-
-      {/* Available Plans */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        {plans?.map((plan) => (
-          <div
-            key={plan._id}
-            className="p-4 border rounded-lg bg-white shadow-sm flex flex-col justify-between"
-          >
-            <div className="mb-3">
-              <p className="font-semibold text-lg">{plan.name}</p>
-              <p className="text-sm text-gray-600 line-clamp-2">{plan.description}</p>
-              <p className="text-xs text-gray-500 mt-1">
-                {plan.roiRate}% {plan.roiInterval}, {plan.roiType}
-              </p>
-            </div>
-            <div className="flex gap-2 mt-auto">
-              <button
-                onClick={() => {
-                  const newName = prompt("Edit plan name:", plan.name);
-                  if (newName) {
-                    updateMutation.mutate({
-                      id: plan._id!,
-                      payload: { ...plan, name: newName },
-                    });
-                  }
-                }}
-                className="flex-1 px-3 py-1 text-sm bg-yellow-500 hover:bg-yellow-600 text-white rounded"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => deleteMutation.mutate(plan._id!)}
-                className="flex-1 px-3 py-1 text-sm bg-red-600 hover:bg-red-700 text-white rounded"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Toggle Button */}
-      <div className="flex justify-center sm:justify-start">
-        <button
-          onClick={() => setShowForm((prev) => !prev)}
-          className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md transition"
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-semibold">Investment Plans</h1>
+        <Button
+          onClick={() => {
+            setEditData(null);
+            setShowForm((prev) => !prev);
+          }}
         >
-          {showForm ? "Cancel" : "➕ Add New Plan"}
-        </button>
+          {showForm ? "Close Form" : "Create New Plan"}
+        </Button>
       </div>
 
-      {/* Drop-down form */}
+      {/* === FORM SECTION === */}
       {showForm && (
-        <div className="mt-4 p-4 border rounded-lg bg-gray-50 shadow-inner">
-          <h2 className="text-lg font-semibold mb-3">Create New Plan</h2>
-          <PlanForm onSubmit={(data) => createMutation.mutate(data)} />
+        <div className="transition-all duration-300 mt-4 border-t pt-4">
+          <PlanForm
+            mode={editData ? "edit" : "create"}
+            initialData={editData || undefined}
+            onSuccess={handleSuccess}
+            onCancel={() => setShowForm(false)}
+          />
         </div>
       )}
+
+      {/* === TABLE SECTION === */}
+      <Table
+        data={plans}
+        columns={[
+          {
+            key: "icon",
+            header: "Plan Icon",
+            render: (plan) =>
+              plan.icon ? (
+                <img
+                  src={plan.icon}
+                  alt={plan.name}
+                  className="w-10 h-10 rounded-full border object-cover"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-xs">
+                  N/A
+                </div>
+              ),
+          },
+          {
+            key: "name",
+            header: "Plan Name",
+            render: (plan) => <p className="font-medium">{plan.name}</p>,
+          },
+          {
+            key: "badge",
+            header: "Badge",
+            render: (plan) => (
+              <span className="px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-700">
+                {plan.badge}
+              </span>
+            ),
+          },
+          {
+            key: "planType",
+            header: "Type",
+            render: (plan) => (
+              <span
+                className={`px-2 py-1 text-xs font-medium rounded ${
+                  plan.planType === "fixed"
+                    ? "bg-green-100 text-green-700"
+                    : "bg-yellow-100 text-yellow-700"
+                }`}
+              >
+                {plan.planType.toUpperCase()}
+              </span>
+            ),
+          },
+          {
+            key: "status",
+            header: "Status",
+            render: (plan) => (
+              <span
+                className={`px-2 py-1 text-xs font-medium rounded ${
+                  plan.status === "active"
+                    ? "bg-green-100 text-green-700"
+                    : "bg-red-100 text-red-700"
+                }`}
+              >
+                {plan.status.toUpperCase()}
+              </span>
+            ),
+          },
+          {
+            key: "actions",
+            header: "Action",
+            render: (plan) => (
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => handleEdit(plan)}
+                >
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={() => plan._id && handleDelete(plan._id)}
+                >
+                  Delete
+                </Button>
+                <Button
+                  size="sm"
+                  variant={plan.status === "active" ? "outline" : "primary"}
+                  loading={loadingId === plan._id}
+                  onClick={() => handleToggleStatus(plan)}
+                >
+                  {plan.status === "active" ? "Deactivate" : "Activate"}
+                </Button>
+              </div>
+            ),
+          },
+        ]}
+        pageSize={8}
+      />
     </div>
   );
 }
