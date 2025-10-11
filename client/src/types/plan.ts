@@ -14,7 +14,7 @@ export interface Plan {
   roiUnit: "%" | "$";
   returnPeriod: "hour" | "daily" | "weekly";
   returnType: "period" | "lifetime";
-  numOfPeriods?: number;
+  durationInDays: number;
   holidays: string[];
   capitalBack: boolean;
   featured: boolean;

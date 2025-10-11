@@ -387,7 +387,7 @@ export default function UserDashboard() {
                 variant="secondary"
                 size="md"
                 className="flex-1 flex items-center justify-center gap-2"
-                onClick={() => navigate("/user/invest")}
+                onClick={() => navigate("/user/plans")}
               >
                 <TrendingUp size={18} /> Invest Now
               </Button>

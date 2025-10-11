@@ -19,6 +19,7 @@ import UserLayout from "./layouts/UserLayout";
 import UserProtected from "./routes/UserProtected";
 import UserDashboardPage from "./pages/user/UserDashboard";
 import DepositPage from "./components/user/Deposit";
+import PlansPage from "./pages/user/Plans";
 
 function App() {
   return (
@@ -50,6 +51,7 @@ function App() {
             <Route element={<UserLayout />}>
               <Route path="dashboard" element={<UserDashboardPage />} />
               <Route path="deposit" element={<DepositPage />} />
+              <Route path="plans" element={<PlansPage />} />
             </Route>
           </Route>
         </Routes>

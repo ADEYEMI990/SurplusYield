@@ -25,6 +25,7 @@ export interface IPlan extends Document {
   status: "active" | "deactivated";
   createdAt: Date;
   updatedAt: Date;
+  durationInDays?: number; // new field for plan duration
 }
 
 const planSchema = new Schema<IPlan>(
@@ -50,6 +51,7 @@ const planSchema = new Schema<IPlan>(
     canCancel: { type: Boolean, default: false },
     trending: { type: Boolean, default: false },
     status: { type: String, enum: ["active", "deactivated"], default: "active" },
+    durationInDays: { type: Number, required: false },
   },
   { timestamps: true }
 );

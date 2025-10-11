@@ -1,7 +1,7 @@
 // server/src/models/Transaction.ts
 import mongoose, { Document, Schema } from "mongoose";
 
-export type TransactionType = "deposit" | "withdrawal" | "investment" | "profit" | "roi" | "bonus";
+export type TransactionType = "deposit" | "withdrawal" | "investment" | "profit" | "roi" | "bonus" | "capitalReturn";
 export type TransactionStatus = "pending" | "success" | "failed";
 
 export type BonusType = "referral" | "deposit" | "investment" | "signup";
@@ -18,6 +18,12 @@ export interface ITransaction extends Document {
   bonusType?: BonusType;
   receipt?: string; // URL or path to receipt image
   currency?: string;
+  roiEarned: number;
+  nextPayoutAt: Date;
+  lastRoiAt?: Date;
+  roiLock: boolean; // ✅ Lock flag to prevent concurrent ROI processing
+  roiLockUntil?: Date | null; // ✅ Timestamp when the lock was set
+  durationInDays?: number; // ✅ Duration of the investment plan in days
 }
 
 const transactionSchema = new Schema<ITransaction>(
@@ -45,6 +51,18 @@ const transactionSchema = new Schema<ITransaction>(
     reference: { type: String, required: true, unique: true },
     receipt: { type: String },
     currency: { type: String, default: "USD" },
+    roiEarned: { type: Number, default: 0 }, // total ROI earned so far
+    nextPayoutAt: {
+      type: Date,
+      required: function () {
+        // Only required for investments
+        return this.type === "investment";
+      },
+    }, // next scheduled ROI payout
+    lastRoiAt: { type: Date }, // timestamp of last ROI credit
+    roiLock: { type: Boolean, default: false }, // ✅ Lock flag
+    roiLockUntil: { type: Date, default: null }, // ✅ Lock timestamp
+    durationInDays: { type: Number, required: false }, // ✅ Duration of the investment plan in days
   },
   { timestamps: true }
 );

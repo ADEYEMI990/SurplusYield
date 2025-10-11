@@ -29,6 +29,10 @@ export async function applyTransactionToWalletAtomic(
       break;
     case "profit":
     case "roi":
+      // profit/roi increases profitWallet
+      inc["profitWallet"] = transaction.amount;
+      inc["mainWallet"] = transaction.amount; // also track totalProfit
+      break;
     case "bonus":
       // these increase profitWallet
       inc["profitWallet"] = transaction.amount;

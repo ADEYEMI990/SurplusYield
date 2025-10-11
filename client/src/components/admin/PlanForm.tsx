@@ -36,6 +36,7 @@ export default function PlanForm({
     canCancel: false,
     trending: false,
     status: "active",
+    durationInDays: 0,
   });
   const [icon, setIcon] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -305,13 +306,13 @@ export default function PlanForm({
             {form.returnType === "period" && (
               <div className="flex gap-3 mt-3">
                 <Input
-                  label="Number of Periods"
-                  name="numOfPeriods"
+                  label="Duration (Days)"
+                  name="durationInDays"
                   type="number"
-                  value={form.numOfPeriods}
+                  value={form.durationInDays}
                   onChange={handleChange}
                 />
-                <span className="self-end mb-1 text-gray-600">Time</span>
+                <span className="self-end mb-1 text-gray-600">Days</span>
               </div>
             )}
           </div>
