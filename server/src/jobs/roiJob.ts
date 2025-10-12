@@ -171,8 +171,7 @@ async function processROICredit() {
           { _id: user._id },
           {
             $inc: {
-              profitWallet: totalProfit,
-              mainWallet: totalProfit,
+              profitWallet: totalProfit
             },
           },
           { session }
@@ -186,7 +185,7 @@ async function processROICredit() {
           amount: profitPerCycle,
           status: "success",
           currency: "USD",
-          reference: `roi_${lockedTxn._id}_${Date.now()}_${i + 1}`,
+          reference: `roi_${Date.now()}`,
         }));
 
         await Transaction.insertMany(roiTxns, { session });

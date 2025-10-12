@@ -3,8 +3,8 @@ import React from "react";
 import clsx from "clsx";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "danger" | "outline";
-  size?: "sm" | "md" | "lg";   // ✅ added
+  variant?: "primary" | "secondary" | "danger" | "outline" | "ghost";
+  size?: "sm" | "md" | "lg" | "icon";   // ✅ added
   loading?: boolean;
 }
 

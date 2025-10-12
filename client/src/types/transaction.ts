@@ -5,10 +5,11 @@ export interface Transaction {
   _id: string;
   user: string;
   plan?: Plan;
-  type: "deposit" | "withdrawal" | "investment" | "bonus";
+  type: "deposit" | "withdrawal" | "investment" | "profit" | "roi" | "capitalReturn" | "bonus";
   amount: number;
   status: "pending" | "success" | "failed";
-  currency: "USD" | "NGN" | string;
+  isCompleted?: boolean;
+  currency: "USD" | string;
   bonusType?: "investment" | "referral";
   createdAt: string;
   updatedAt: string;

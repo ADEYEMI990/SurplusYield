@@ -1,6 +1,6 @@
 // src/components/user/UserDashboard.tsx
 import { useEffect, useRef, useState } from "react";
-import { Bell, Settings, KeyRound, LogOut, Copy } from "lucide-react";
+import { Bell, Settings, KeyRound, LogOut, Copy, User } from "lucide-react";
 import {
   Wallet,
   Folder,
@@ -48,20 +48,30 @@ export default function UserDashboard() {
   // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
+
+      // Close notifications if open and click is outside it
       if (
+        showNotifications &&
         notificationsRef.current &&
-        !notificationsRef.current.contains(event.target as Node) &&
-        profileRef.current &&
-        !profileRef.current.contains(event.target as Node)
+        !notificationsRef.current.contains(target)
       ) {
         setShowNotifications(false);
+      }
+
+      // Close profile menu if open and click is outside it
+      if (
+        showProfileMenu &&
+        profileRef.current &&
+        !profileRef.current.contains(target)
+      ) {
         setShowProfileMenu(false);
       }
     }
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [showNotifications, showProfileMenu]);
 
   const referralCode = user?.referralCode || "";
 
@@ -262,7 +272,7 @@ export default function UserDashboard() {
         {/* Right */}
         <div className="flex items-center gap-4 relative">
           {/* Notifications */}
-          <div className="relative">
+          <div ref={notificationsRef} className="relative">
             <Bell
               className="cursor-pointer"
               onClick={() => {
@@ -283,16 +293,16 @@ export default function UserDashboard() {
           </h2>
 
           {/* Profile dropdown */}
-          <div className="relative">
-            <img
-              src="/default-avatar.png"
-              alt="profile"
-              className="w-8 h-8 rounded-full cursor-pointer"
+          <div ref={profileRef} className="relative">
+            <User
+              size={32}
+              className="text-gray-300 cursor-pointer rounded-full p-1 hover:bg-gray-800"
               onClick={() => {
                 setShowProfileMenu((s) => !s);
                 setShowNotifications(false); // ✅ close notifications when opening profile
               }}
             />
+
             {showProfileMenu && (
               <div className="absolute right-0 mt-2 w-48 bg-gray-900 text-white rounded shadow-lg">
                 <ul className="divide-y divide-gray-700">
@@ -322,11 +332,30 @@ export default function UserDashboard() {
         <CardHeader>
           <CardTitle>Referral Code</CardTitle>
         </CardHeader>
-        <CardContent className="flex items-center gap-2">
-          <Input value={referralCode} readOnly />
-          <Button variant="outline" onClick={copyReferral}>
-            <Copy className="w-4 h-4" />
-          </Button>
+        <CardContent>
+          <div className="relative w-72">
+            <Input
+              value={referralCode}
+              readOnly
+              className="pr-12 text-sm focus:ring-2 focus:ring-indigo-500"
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={copyReferral}
+              className="
+          absolute right-1 top-1/2 -translate-y-1/2
+          transition-all duration-200
+          hover:bg-gray-700 hover:text-white
+          hover:scale-150
+          active:scale-95
+          shadow-sm hover:shadow-md
+          rounded-full
+        "
+            >
+              <Copy className="w-4 h-4" />
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

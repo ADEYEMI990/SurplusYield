@@ -156,7 +156,7 @@ export default function AdminTransactions() {
           options={[
             { value: "", label: "All" },
             { value: "pending", label: "Pending" },
-            { value: "completed", label: "Completed" },
+            { value: "success", label: "Success" },
             { value: "failed", label: "Failed" },
           ]}
         />

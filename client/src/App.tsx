@@ -20,6 +20,7 @@ import UserProtected from "./routes/UserProtected";
 import UserDashboardPage from "./pages/user/UserDashboard";
 import DepositPage from "./components/user/Deposit";
 import PlansPage from "./pages/user/Plans";
+import WithdrawPage from "./pages/user/Withdraw";
 
 function App() {
   return (
@@ -52,6 +53,7 @@ function App() {
               <Route path="dashboard" element={<UserDashboardPage />} />
               <Route path="deposit" element={<DepositPage />} />
               <Route path="plans" element={<PlansPage />} />
+              <Route path="withdraw" element={<WithdrawPage />} />
             </Route>
           </Route>
         </Routes>

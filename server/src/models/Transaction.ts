@@ -70,11 +70,15 @@ const transactionSchema = new Schema<ITransaction>(
 // ✅ Auto-generate reference before validation if missing
 transactionSchema.pre("validate", function (next) {
   if (!this.reference) {
-    const base = `TXN-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const base = `${Date.now()}}`;
     if (this.bonusType === "signup") {
       this.reference = `${base}-SIGNUP`;
     } else if (this.bonusType === "referral") {
       this.reference = `${base}-REFERRAL`;
+    } else if (this.bonusType === "investment") {
+      this.reference = `${base}-INVESTMENT`;
+    } else if (this.bonusType === "deposit") {
+      this.reference = `${base}-DEPOSIT`;
     } else {
       this.reference = base;
     }

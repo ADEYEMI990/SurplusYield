@@ -6,7 +6,7 @@ export interface Transaction {
   _id: string;
   user: { email: string };
   plan?: { name: string };
-  type: "deposit" | "withdrawal" | "investment" | "profit" | "roi" | "bonus";
+  type: "deposit" | "withdrawal" | "investment" | "profit" | "roi" | "bonus" | "capitalReturn";
   amount: number;
   status: "pending" | "completed" | "failed";
   reference: string;
