@@ -185,7 +185,7 @@ async function processROICredit() {
           amount: profitPerCycle,
           status: "success",
           currency: "USD",
-          reference: `roi_${Date.now()}`,
+          reference: `${Date.now()}`,
         }));
 
         await Transaction.insertMany(roiTxns, { session });
@@ -229,7 +229,7 @@ async function processROICredit() {
                 amount: capitalBackAmount,
                 status: "success",
                 currency: "USD",
-                reference: `capital_return_${lockedTxn._id}_${Date.now()}`,
+                reference: `${Date.now()}`,
               },
             ],
             { session }

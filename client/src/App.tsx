@@ -21,6 +21,7 @@ import UserDashboardPage from "./pages/user/UserDashboard";
 import DepositPage from "./components/user/Deposit";
 import PlansPage from "./pages/user/Plans";
 import WithdrawPage from "./pages/user/Withdraw";
+import TransactionsPage from "./pages/user/Transactions";
 
 function App() {
   return (
@@ -54,6 +55,7 @@ function App() {
               <Route path="deposit" element={<DepositPage />} />
               <Route path="plans" element={<PlansPage />} />
               <Route path="withdraw" element={<WithdrawPage />} />
+              <Route path="transactions" element={<TransactionsPage />} />
             </Route>
           </Route>
         </Routes>

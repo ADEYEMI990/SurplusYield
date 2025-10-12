@@ -255,7 +255,7 @@ export default function UserDashboard() {
   }, []);
 
   return (
-    <div>
+    <div >
       {/* Navbar */}
       <nav className="bg-white shadow px-6 py-3 flex justify-between items-center">
         {/* Left: Logo + name */}
@@ -449,7 +449,7 @@ export default function UserDashboard() {
               title="Total Investment"
               value={`$${stats?.totalInvestment || 0}`}
               icon={<TrendingUp size={22} />}
-              onClick={() => navigate("/user/invest")}
+              onClick={() => navigate("/user/plans")}
             />
             <SummaryCard
               title="Total Profit"

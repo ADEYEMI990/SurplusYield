@@ -1,12 +1,20 @@
 // client/src/components/user/Deposit.tsx
 import { useState } from "react";
 import { toast } from "react-toastify";
-import { Copy, CheckCircle2, Upload, CheckCircle, Bitcoin } from "lucide-react";
+import {
+  Copy,
+  CheckCircle2,
+  Upload,
+  CheckCircle,
+  Bitcoin,
+  ArrowLeft,
+} from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import Button from "../common/Button";
 import useAuthStore from "../../stores/authStore";
 import API from "../../lib/api";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 export default function Deposit() {
   const { user } = useAuthStore();
@@ -17,6 +25,7 @@ export default function Deposit() {
   const [copied, setCopied] = useState(false);
   const [receipt, setReceipt] = useState<File | null>(null);
   const [referenceId, setReferenceId] = useState<string>("");
+  const navigate = useNavigate();
 
   const walletAddress = "1KgHhwLqj7ouYMFkxACxSh7r4v22sQsfwu";
 
@@ -88,12 +97,21 @@ export default function Deposit() {
 
   return (
     <div className="w-full max-w-lg mx-auto p-4 sm:p-6 md:p-8 lg:p-10 text-center">
+      {/* === HEADER === */}
+      <div className="flex items-center gap-3">
+        <button
+          title="Go Back"
+          onClick={() => navigate("/user/dashboard")}
+          className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <h1 className="text-xl font-semibold text-center w-full">
+          Deposit Funds
+        </h1>
+      </div>
       {!showPendingSummary && (
         <>
-          {/* ===== Title & Description ===== */}
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-3">
-            Deposit Funds
-          </h1>
           <p className="text-gray-500 text-sm sm:text-base mb-6 leading-relaxed">
             Minimum Deposit: <b>$100 USD</b> <br />
             Maximum Deposit: <b>Unlimited</b>
@@ -236,7 +254,11 @@ export default function Deposit() {
           </p>
 
           <div className="flex flex-col sm:flex-row justify-center gap-3 mt-4">
-            <Button variant="secondary" className="flex-1" onClick={resetDeposit}>
+            <Button
+              variant="secondary"
+              className="flex-1"
+              onClick={resetDeposit}
+            >
               Deposit Again
             </Button>
             <Button
@@ -252,4 +274,3 @@ export default function Deposit() {
     </div>
   );
 }
-

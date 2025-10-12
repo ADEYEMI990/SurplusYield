@@ -6,10 +6,11 @@ import Card from "../common/Card";
 import Button from "../common/Button";
 import Select from "../common/Select";
 import Loader from "../common/Loader";
-import { Check, X } from "lucide-react";
+import { Check, X, ArrowLeft } from "lucide-react";
 import { toast } from "react-toastify";
 import type { Transaction } from "../../types/transaction";
 import type { ChangeEvent } from "react";
+import { useNavigate } from "react-router-dom";
 
 interface Plan {
   _id: string;
@@ -45,6 +46,15 @@ export default function UserPlans() {
   const [amount, setAmount] = useState<number>(0);
   const [balances, setBalances] = useState({ mainWallet: 0 });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const navigate = useNavigate();
+
+  const getProgressClass = (percent: number) => {
+    if (percent >= 100) return "w-full";
+    if (percent >= 75) return "w-3/4";
+    if (percent >= 50) return "w-1/2";
+    if (percent >= 25) return "w-1/4";
+    return "w-0";
+  };
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -200,10 +210,19 @@ export default function UserPlans() {
   if (loading) return <Loader />;
 
   return (
-    <div className="w-full max-w-7xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
-      <h1 className="text-3xl font-bold mb-8 text-center text-gray-900">
-        💼 Investment Plans
-      </h1>
+    <div className="space-y-6 p-4 md:p-6">
+      <div className="flex items-center gap-3">
+        <button
+          title="Go Back"
+          onClick={() => navigate("/user/dashboard")}
+          className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <h1 className="text-xl font-semibold text-center w-full">
+          💼 Investment Plans
+        </h1>
+      </div>
 
       {/* ==== PLAN CARDS ==== */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -551,8 +570,9 @@ export default function UserPlans() {
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
                           <div
-                            className="bg-green-500 h-2 rounded-full"
-                            style={{ width: `${percentDone}%` }}
+                            className={`bg-green-500 h-2 rounded-full transition-all duration-300 ${getProgressClass(
+                              percentDone
+                            )}`}
                           ></div>
                         </div>
                         <div className="text-xs text-gray-500 mt-1">

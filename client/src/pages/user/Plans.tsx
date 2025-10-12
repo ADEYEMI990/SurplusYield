@@ -3,8 +3,10 @@ import UserPlans from "../../components/user/Plans";
 
 export default function PlansPage() {
   return (
-    <div className="min-h-screen bg-gray-50 py-8 flex justify-center">
+    <div className="min-h-screen">
+      <div className="max-w-5xl mx-auto py-6">
       <UserPlans />
+      </div>
     </div>
   );
 }

@@ -7,6 +7,8 @@ import Select from "../common/Select";
 import { toast } from "react-toastify";
 import API from "../../lib/api"; // ✅ use centralized Axios instance
 import type { Transaction } from "../../types/transaction";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 
 interface Balances {
   mainWallet: number;
@@ -18,12 +20,15 @@ export default function Withdraw() {
     mainWallet: 0,
     profitWallet: 0,
   });
-  const [step, setStep] = useState<"form" | "btc" | "confirm" | "pending">("form");
+  const [step, setStep] = useState<"form" | "btc" | "confirm" | "pending">(
+    "form"
+  );
   const [walletType, setWalletType] = useState("main");
   const [amount, setAmount] = useState("");
   const [btcAddress, setBtcAddress] = useState("");
   const [loading, setLoading] = useState(false);
   const [reference, setReference] = useState("");
+  const navigate = useNavigate();
 
   // ✅ Fetch balances on load (uses token automatically)
   useEffect(() => {
@@ -58,15 +63,19 @@ export default function Withdraw() {
       const txns = txnsRes.data;
       const stats = userStatsRes.data;
 
-      const hasInvestment = txns.some((t: Transaction) => t.type === "investment");
-      if (!hasInvestment) return toast.error("You need to invest before withdraw");
+      const hasInvestment = txns.some(
+        (t: Transaction) => t.type === "investment"
+      );
+      if (!hasInvestment)
+        return toast.error("You need to invest before withdraw");
 
       // Check if any investment is still active
       const activeInvestment = txns.find(
         (t: Transaction) =>
           t.type === "investment" && t.status === "success" && !t.isCompleted
       );
-      if (activeInvestment) return toast.error("Your investment period needs to elapse");
+      if (activeInvestment)
+        return toast.error("Your investment period needs to elapse");
 
       // Check referral
       if (stats.totalReferrals < 1)
@@ -83,7 +92,8 @@ export default function Withdraw() {
 
   // ✅ Step 2 — validate BTC address
   const handleBtcProceed = () => {
-    if (!btcAddress.trim()) return toast.error("Paste your Bitcoin wallet address");
+    if (!btcAddress.trim())
+      return toast.error("Paste your Bitcoin wallet address");
     setStep("confirm");
   };
 
@@ -120,8 +130,17 @@ export default function Withdraw() {
     <div className="w-full flex justify-center mt-6 px-3">
       <Card className="w-full max-w-md bg-white">
         <CardHeader>
-          <CardTitle className="text-center text-2xl font-semibold">
-            Withdraw Money
+          <CardTitle className="mb-2">
+            <div className="flex items-center gap-3">
+            <button
+              title="Go Back"
+              onClick={() => navigate("/user/dashboard")}
+              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h1 className="text-xl font-semibold text-center w-full">Withdraw Money</h1>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -165,7 +184,8 @@ export default function Withdraw() {
               </p>
               <p className="text-sm text-red-500">
                 Please make sure that only BTC wallet address is input below.
-                Otherwise, your withdraw amount will not be deposited nor refunded.
+                Otherwise, your withdraw amount will not be deposited nor
+                refunded.
               </p>
 
               <Input
@@ -201,7 +221,11 @@ export default function Withdraw() {
               </div>
 
               <div className="flex gap-3 mt-3">
-                <Button onClick={handleConfirm} className="flex-1" loading={loading}>
+                <Button
+                  onClick={handleConfirm}
+                  className="flex-1"
+                  loading={loading}
+                >
                   Confirm Withdraw
                 </Button>
                 <Button

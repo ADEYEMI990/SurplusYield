@@ -70,7 +70,7 @@ export default function SignupUser() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4 sm:px-6 py-8">
+    <div className="min-h-screen flex items-center justify-center  bg-gray-100 px-4 sm:px-6 py-8">
       <Card className="w-full max-w-md shadow-lg rounded-xl">
         <CardHeader className="text-center">
           <CardTitle className="text-lg sm:text-xl font-bold">
