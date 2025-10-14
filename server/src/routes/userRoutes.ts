@@ -1,22 +1,11 @@
 // server/src/routes/userRoutes.ts
-import { Router } from "express";
-import { getPlans } from "../controllers/userPlansController";
-import { getWallet, deposit, withdraw } from "../controllers/walletController";
-import { getUserTransactions } from "../controllers/userTransactionsController";
-import { investInPlan } from "../controllers/investmentController";
+import express from "express";
 import { protect } from "../middleware/authMiddleware";
+import { getReferralDepositStatus } from "../controllers/userController";
 
-const router = Router();
+const router = express.Router();
 
-// Public
-router.get("/plans", getPlans);
-
-// Protected
-router.get("/wallet", protect, getWallet);
-router.post("/wallet/deposit", protect, deposit);
-router.post("/wallet/withdraw", protect, withdraw);
-
-router.get("/transactions", protect, getUserTransactions);
-router.post("/invest", protect, investInPlan);
+// ✅ Protected route
+router.get("/referral-status", protect, getReferralDepositStatus);
 
 export default router;

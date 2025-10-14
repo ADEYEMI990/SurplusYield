@@ -55,13 +55,14 @@ export default function Withdraw() {
     if (amt > available) return toast.error("Insufficient balance");
 
     try {
-      // Check investment & referral conditions
-      const [txnsRes, userStatsRes] = await Promise.all([
+      // ✅ Fetch transactions, dashboard stats, and referral deposit info
+      const [txnsRes,referralRes] = await Promise.all([
         API.get("/transactions/my"),
-        API.get("/transactions/stats"),
+        API.get("/users/referral-status"),
       ]);
+
       const txns = txnsRes.data;
-      const stats = userStatsRes.data;
+      const referralStatus = referralRes.data;
 
       const hasInvestment = txns.some(
         (t: Transaction) => t.type === "investment"
@@ -69,7 +70,7 @@ export default function Withdraw() {
       if (!hasInvestment)
         return toast.error("You need to invest before withdraw");
 
-      // Check if any investment is still active
+      // ✅ Check active investment
       const activeInvestment = txns.find(
         (t: Transaction) =>
           t.type === "investment" && t.status === "success" && !t.isCompleted
@@ -77,12 +78,19 @@ export default function Withdraw() {
       if (activeInvestment)
         return toast.error("Your investment period needs to elapse");
 
-      // Check referral
-      if (stats.totalReferrals < 1)
+      // ✅ Check referral condition
+      if (referralStatus.totalReferrals < 1)
         return toast.error(
-          "You need to refer at least one person who has deposited before withdraw"
+          "You must refer at least one person before withdrawal"
         );
 
+      // ✅ Check if referred person has deposited
+      if (!referralStatus.hasDepositingReferral)
+        return toast.error(
+          "At least one of your referred users must have made a successful deposit before you can withdraw"
+        );
+
+      // ✅ Passed all conditions
       setStep("btc");
     } catch (err) {
       console.error(err);
@@ -132,14 +140,16 @@ export default function Withdraw() {
         <CardHeader>
           <CardTitle className="mb-2">
             <div className="flex items-center gap-3">
-            <button
-              title="Go Back"
-              onClick={() => navigate("/user/dashboard")}
-              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-xl font-semibold text-center w-full">Withdraw Money</h1>
+              <button
+                title="Go Back"
+                onClick={() => navigate("/user/dashboard")}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <h1 className="text-xl font-semibold text-center w-full">
+                Withdraw Money
+              </h1>
             </div>
           </CardTitle>
         </CardHeader>

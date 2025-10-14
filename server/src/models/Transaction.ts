@@ -2,7 +2,7 @@
 import mongoose, { Document, Schema } from "mongoose";
 
 export type TransactionType = "deposit" | "withdrawal" | "investment" | "profit" | "roi" | "bonus" | "capitalReturn";
-export type TransactionStatus = "pending" | "success" | "failed";
+export type TransactionStatus = "pending" | "success" | "failed" | "completed";
 
 export type BonusType = "referral" | "deposit" | "investment" | "signup";
 
@@ -32,7 +32,7 @@ const transactionSchema = new Schema<ITransaction>(
     plan: { type: Schema.Types.ObjectId, ref: "Plan" },
     type: {
       type: String,
-      enum: ["deposit", "withdrawal", "investment", "profit", "roi", "bonus"],
+      enum: ["deposit", "withdrawal", "investment", "profit", "roi", "bonus", "capitalReturn"],
       required: true,
     },
     bonusType: {
@@ -45,7 +45,7 @@ const transactionSchema = new Schema<ITransaction>(
     amount: { type: Number, required: true },
     status: {
       type: String,
-      enum: ["pending", "success", "failed"],
+      enum: ["pending", "success", "failed", "completed"],
       default: "pending",
     },
     reference: { type: String, required: true, unique: true },
@@ -70,15 +70,15 @@ const transactionSchema = new Schema<ITransaction>(
 // ✅ Auto-generate reference before validation if missing
 transactionSchema.pre("validate", function (next) {
   if (!this.reference) {
-    const base = `${Date.now()}}`;
+    const base = `${Date.now()}`;
     if (this.bonusType === "signup") {
-      this.reference = `${base}-SIGNUP`;
+      this.reference = `${base}`;
     } else if (this.bonusType === "referral") {
-      this.reference = `${base}-REFERRAL`;
+      this.reference = `${base}`;
     } else if (this.bonusType === "investment") {
-      this.reference = `${base}-INVESTMENT`;
+      this.reference = `${base}`;
     } else if (this.bonusType === "deposit") {
-      this.reference = `${base}-DEPOSIT`;
+      this.reference = `${base}`;
     } else {
       this.reference = base;
     }

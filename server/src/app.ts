@@ -47,7 +47,7 @@ app.use("/api/site/landing", landingRoutes);
 app.use("/api/site/pages", pageRoutes);
 app.use("/api/site/navigation", navigationRoutes);
 app.use("/api/site/footer", footerRoutes);
-app.use("/api/user", userRoutes);
+app.use("/api/users", userRoutes);
 
 // Error handling
 app.use(notFound);

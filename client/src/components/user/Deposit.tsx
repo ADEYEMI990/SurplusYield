@@ -58,7 +58,7 @@ export default function Deposit() {
     }
 
     try {
-      const ref = `TXN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      const ref = `${Date.now()}`;
 
       const formData = new FormData();
       formData.append("user", user._id);

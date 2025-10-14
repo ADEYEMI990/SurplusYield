@@ -6,11 +6,10 @@ import { Transaction } from "../models/Transaction";
 import User from "../models/User";
 import connectDB from "../config/db";
 
-console.log(chalk.greenBright("✅ ROI Cron Job Initialized"));
+console.log(chalk.greenBright("✅ ROI Cron Job Initialized (Debug Mode)"));
 
 let retrying = false;
 
-// === MAIN ROI CREDIT FUNCTION ===
 async function processROICredit() {
   const now = new Date();
   console.log(
@@ -18,271 +17,205 @@ async function processROICredit() {
   );
 
   try {
-    // --- Ensure DB connected ---
+    // Ensure DB connection
     if (mongoose.connection.readyState !== 1) {
-      console.log(chalk.yellow("⚠️  DB disconnected. Attempting reconnect..."));
+      console.log(chalk.yellow("⚠️ DB disconnected. Attempting reconnect..."));
       await connectDB();
     }
 
-    // --- Find all active investment transactions ---
-    const transactions = await Transaction.find({
+    // Fetch investments due for ROI
+    const allInvestments = await Transaction.find({
       type: "investment",
-      status: "success",
-    });
+    })
+      .populate("plan")
+      .populate("user");
 
-    if (!transactions.length) {
-      console.log(chalk.gray("ℹ️  No active investments found."));
+    if (allInvestments.length === 0) {
+      console.log(chalk.gray("ℹ️ No investments found at all."));
       return;
     }
 
     console.log(
-      chalk.greenBright(
-        `📊 Found ${transactions.length} active investment(s) to process.`
+      chalk.blueBright(`📦 Found ${allInvestments.length} total investment(s).`)
+    );
+
+    const eligibleInvestments = [];
+
+    // --- Debug Filtering Pass ---
+    for (const txn of allInvestments) {
+      const plan: any = txn.plan;
+      const user: any = txn.user;
+
+      const reasons: string[] = [];
+
+      if (!plan || !user) reasons.push("❌ Missing plan or user reference.");
+
+      if (txn.roiLock) reasons.push("🔒 ROI lock enabled.");
+
+      if (!["success", "pending"].includes(txn.status))
+        reasons.push(`🚫 Invalid status: ${txn.status}`);
+
+      const endDate = new Date(txn.createdAt);
+      endDate.setDate(
+        endDate.getDate() + (txn.durationInDays || plan?.durationInDays || 0)
+      );
+
+      if (txn.status === "completed" || now >= endDate)
+        reasons.push("🏁 Investment matured or completed.");
+
+      if (!txn.nextPayoutAt) reasons.push("⚠️ nextPayoutAt is missing.");
+      else if (txn.nextPayoutAt > now)
+        reasons.push(
+          `🕒 ROI not due yet (next at ${txn.nextPayoutAt.toISOString()})`
+        );
+
+      // ✅ If no skip reason, mark eligible
+      if (reasons.length === 0) {
+        eligibleInvestments.push(txn);
+      } else {
+        console.log(
+          chalk.gray(
+            `⏩ Skipping ${user?.email || "unknown user"} (${txn._id}):\n  - ${reasons.join(
+              "\n  - "
+            )}`
+          )
+        );
+      }
+    }
+
+    // --- Process eligible investments ---
+    if (eligibleInvestments.length === 0) {
+      console.log(
+        chalk.gray(
+          "ℹ️ No eligible investments found for ROI processing after debug filtering."
+        )
+      );
+      return;
+    }
+
+    console.log(
+      chalk.yellowBright(
+        `📊 Found ${eligibleInvestments.length} eligible investment(s) for ROI crediting.`
       )
     );
 
-    let totalCredited = 0;
-    let totalUsersCredited = 0;
-
-    for (const txn of transactions) {
-      if (txn.roiLock && txn.roiLockUntil && txn.roiLockUntil > now) {
-        console.log(
-          chalk.yellow(`🔒 Skipping locked txn ${txn._id} (ROI lock active)`)
-        );
-        continue;
-      }
-
-      const session: ClientSession = await mongoose.startSession();
+    // --- Process each eligible investment ---
+    for (const txn of eligibleInvestments) {
+      const session = await mongoose.startSession();
       session.startTransaction();
 
       try {
-        const lockedTxn = await Transaction.findOneAndUpdate(
-          {
-            _id: txn._id,
-            $or: [{ roiLock: { $ne: true } }, { roiLockUntil: { $lt: now } }],
-          },
-          {
-            $set: {
-              roiLock: true,
-              roiLockUntil: new Date(now.getTime() + 5 * 60 * 1000),
-            },
-          },
-          { session, new: true }
-        );
+        const plan: any = txn.plan;
+        const user: any = txn.user;
 
-        if (!lockedTxn) {
-          await session.abortTransaction();
-          session.endSession();
-          continue;
-        }
+        const intervalMs =
+          plan.returnPeriod === "hour"
+            ? 1000 * 60 * 60
+            : plan.returnPeriod === "weekly"
+            ? 1000 * 60 * 60 * 24 * 7
+            : 1000 * 60 * 60 * 24; // daily default
 
-        await lockedTxn.populate("plan");
-        await lockedTxn.populate("user");
-        const plan: any = lockedTxn.plan;
-        const user: any = lockedTxn.user;
-
-        if (!plan || !user) {
-          console.log(
-            chalk.red(
-              `⚠️  Missing plan or user for txn ${lockedTxn._id}. Skipping.`
-            )
-          );
-          await session.abortTransaction();
-          session.endSession();
-          continue;
-        }
-
-        console.log(
-          chalk.blueBright(
-            `\n🔍 ${user.email} — Plan: ${plan.name} | ROI: ${plan.roiValue}${plan.roiUnit} every ${plan.returnPeriod} | Amount: $${lockedTxn.amount}`
-          )
-        );
-
-        // --- Skip if credited recently ---
-        if (
-          lockedTxn.lastRoiAt &&
-          now.getTime() - lockedTxn.lastRoiAt.getTime() < 1000 * 60 * 20
-        ) {
-          console.log(
-            chalk.gray(`⏳ Skipping ${user.email} — credited recently.`)
-          );
-          await Transaction.updateOne(
-            { _id: lockedTxn._id },
-            { $set: { roiLock: false, roiLockUntil: null } },
-            { session }
-          );
-          await session.commitTransaction();
-          session.endSession();
-          continue;
-        }
-
-        // --- Determine payout interval ---
-        let intervalMs = 1000 * 60 * 60 * 24; // default daily
-        switch (plan.returnPeriod) {
-          case "hour":
-            intervalMs = 1000 * 60 * 60;
-            break;
-          case "weekly":
-            intervalMs = 1000 * 60 * 60 * 24 * 7;
-            break;
-        }
-
-        const nextPayoutAt = lockedTxn.nextPayoutAt ?? lockedTxn.createdAt;
-        const timeSinceNext = now.getTime() - nextPayoutAt.getTime();
-        const missedCycles = Math.floor(timeSinceNext / intervalMs);
-
-        if (missedCycles <= 0) {
-          const nextIn = Math.max(0, intervalMs - timeSinceNext);
-          const hrs = Math.floor(nextIn / (1000 * 60 * 60));
-          const mins = Math.floor((nextIn % (1000 * 60 * 60)) / (1000 * 60));
-
-          console.log(
-            chalk.magentaBright(
-              `🕒 ${
-                user.email
-              } next ROI due in ${hrs}h ${mins}m (${nextPayoutAt.toISOString()})`
-            )
-          );
-
-          lockedTxn.roiLock = false;
-          lockedTxn.roiLockUntil = undefined;
-          await lockedTxn.save({ session });
-          await session.commitTransaction();
-          session.endSession();
-          continue;
-        }
-
-        // --- Calculate profit ---
+        const timeDiff = now.getTime() - txn.nextPayoutAt.getTime();
+        const missedCycles = Math.max(1, Math.floor(timeDiff / intervalMs));
         const roiValue = plan.roiValue || 0;
+
         const profitPerCycle =
-          plan.roiUnit === "%" ? (lockedTxn.amount * roiValue) / 100 : roiValue;
+          plan.roiUnit === "%" ? (txn.amount * roiValue) / 100 : roiValue;
+
         const totalProfit = profitPerCycle * missedCycles;
 
-        console.log(
-          chalk.yellowBright(
-            `⏰ Missed ${missedCycles} cycle(s) — Each: $${profitPerCycle.toFixed(
-              2
-            )}, Total: $${totalProfit.toFixed(2)}`
-          )
-        );
-
-        // --- Update user balances ---
+        // 👛 Credit user’s profit wallet
         await User.updateOne(
           { _id: user._id },
-          {
-            $inc: {
-              profitWallet: totalProfit
-            },
-          },
+          { $inc: { profitWallet: totalProfit } },
           { session }
         );
 
-        // --- Log ROI transactions ---
-        const roiTxns = Array.from({ length: missedCycles }, (_, i) => ({
+        // 🧾 Record ROI transactions
+        const roiRecords = Array.from({ length: missedCycles }, (_, i) => ({
           user: user._id,
-          type: "roi",
           plan: plan._id,
+          type: "roi",
           amount: profitPerCycle,
           status: "success",
-          currency: "USD",
-          reference: `${Date.now()}`,
+          reference: `${Date.now()}_${i + 1}`,
         }));
 
-        await Transaction.insertMany(roiTxns, { session });
+        await Transaction.insertMany(roiRecords, { session });
 
-        // --- Update main investment ---
-        lockedTxn.roiEarned = (lockedTxn.roiEarned || 0) + totalProfit;
-        lockedTxn.lastRoiAt = now;
-        lockedTxn.nextPayoutAt = new Date(
-          nextPayoutAt.getTime() + missedCycles * intervalMs
+        // Update investment record
+        txn.roiEarned += totalProfit;
+        txn.lastRoiAt = now;
+        txn.nextPayoutAt = new Date(now.getTime() + intervalMs);
+
+        const endDate = new Date(txn.createdAt);
+        endDate.setDate(
+          endDate.getDate() + (txn.durationInDays || plan.durationInDays || 0)
         );
-        lockedTxn.roiLock = false;
-        lockedTxn.roiLockUntil = undefined;
 
-        // --- Check completion ---
-        const endDate = new Date(lockedTxn.createdAt);
-        endDate.setDate(endDate.getDate() + (plan.durationInDays || 0));
-        if (now >= endDate) {
-          lockedTxn.status = "success";
+        if (txn.nextPayoutAt >= endDate) {
+          txn.status = "completed";
 
-          // === Return user's invested capital ===
-          const capitalBackAmount = lockedTxn.amount;
+          const alreadyReturned = await Transaction.exists({
+            user: user._id,
+            plan: plan._id,
+            type: "capitalReturn",
+          });
 
-          console.log(
-            `🏁 Investment completed for ${user.email} — Returning capital $${capitalBackAmount}`
-          );
+          if (!alreadyReturned) {
+            await User.updateOne(
+              { _id: user._id },
+              { $inc: { mainWallet: txn.amount } },
+              { session }
+            );
 
-          // ✅ Update user's main wallet with capital back
-          await User.updateOne(
-            { _id: user._id },
-            { $inc: { mainWallet: capitalBackAmount } },
-            { session }
-          );
+            await Transaction.create(
+              [
+                {
+                  user: user._id,
+                  plan: plan._id,
+                  type: "capitalReturn",
+                  amount: txn.amount,
+                  status: "success",
+                  reference: `${Date.now()}`,
+                },
+              ],
+              { session }
+            );
 
-          // ✅ Log capital return transaction
-          await Transaction.create(
-            [
-              {
-                user: user._id,
-                plan: plan._id,
-                type: "capitalReturn",
-                amount: capitalBackAmount,
-                status: "success",
-                currency: "USD",
-                reference: `${Date.now()}`,
-              },
-            ],
-            { session }
-          );
-
-          console.log(
-            chalk.greenBright(
-              `💸 Capital $${capitalBackAmount} returned to ${user.email}'s main wallet`
-            )
-          );
+            console.log(chalk.greenBright(`💸 Capital returned to ${user.email}`));
+          }
         }
 
-        await lockedTxn.save({ session });
+        await txn.save({ session });
         await session.commitTransaction();
         session.endSession();
 
-        totalCredited += totalProfit;
-        totalUsersCredited++;
-
         console.log(
           chalk.greenBright(
-            `💰 Credited ${missedCycles} ROI cycle(s) totaling $${totalProfit.toFixed(
-              2
-            )} to ${user.email}`
+            `✅ Credited $${totalProfit.toFixed(2)} ROI to ${
+              user.email
+            } (${missedCycles}x)`
           )
         );
       } catch (err) {
         await session.abortTransaction();
         session.endSession();
         console.error(
-          chalk.redBright(`❌ Error processing txn ${txn._id}:`),
-          err
+          chalk.redBright(
+            `❌ Error processing ROI for ${txn._id}: ${
+              err instanceof Error ? err.message : String(err)
+            }`
+          )
         );
       }
     }
 
-    console.log(chalk.whiteBright("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
-    console.log(
-      chalk.greenBright(
-        `✅ ROI Cycle Complete: ${transactions.length} investment(s) processed`
-      )
-    );
-    console.log(
-      chalk.cyanBright(
-        `📈 Total Users Credited: ${totalUsersCredited} | Total Amount: $${totalCredited.toFixed(
-          2
-        )}`
-      )
-    );
-    console.log(chalk.whiteBright("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"));
+    console.log(chalk.cyanBright("🏁 ROI Job completed successfully.\n"));
   } catch (err) {
     console.error(chalk.redBright("❌ ROI Cron Error:"), err);
 
+    // Retry once if crash occurs
     if (!retrying) {
       retrying = true;
       setTimeout(async () => {
@@ -294,5 +227,7 @@ async function processROICredit() {
   }
 }
 
-// --- Schedule hourly (since ROI is hourly) ---
+// Run every hour on the hour
 cron.schedule("0 * * * *", processROICredit);
+
+export default processROICredit;
