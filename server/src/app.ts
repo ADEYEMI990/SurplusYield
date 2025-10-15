@@ -20,6 +20,8 @@ import userRoutes from "./routes/userRoutes";
 import "./jobs/roiJob";
 import { notFound, errorHandler } from "./middleware/errorMiddleware";
 import path from "path";
+import kycRoutes from "./routes/KycRoutes";
+import uploadRoutes from "./routes/uploadRoutes";
 
 dotenv.config();
 connectDB();
@@ -48,6 +50,8 @@ app.use("/api/site/pages", pageRoutes);
 app.use("/api/site/navigation", navigationRoutes);
 app.use("/api/site/footer", footerRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/kyc", kycRoutes);
+app.use("/api/upload", uploadRoutes);
 
 // Error handling
 app.use(notFound);

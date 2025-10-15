@@ -255,7 +255,7 @@ export default function UserDashboard() {
   }, []);
 
   return (
-    <div >
+    <div>
       {/* Navbar */}
       <nav className="bg-white shadow px-6 py-3 flex justify-between items-center">
         {/* Left: Logo + name */}
@@ -306,12 +306,20 @@ export default function UserDashboard() {
             {showProfileMenu && (
               <div className="absolute right-0 mt-2 w-48 bg-gray-900 text-white rounded shadow-lg">
                 <ul className="divide-y divide-gray-700">
-                  <li className="px-4 py-2 hover:bg-gray-700 cursor-pointer flex items-center gap-2">
-                    <Settings size={16} /> Settings
+                  <li
+                    className="px-4 py-2 hover:bg-gray-700 cursor-pointer flex items-center gap-2"
+                    onClick={() => navigate("/user/kyc")}
+                  >
+                    <Settings size={16} /> Kyc
                   </li>
-                  <li className="px-4 py-2 hover:bg-gray-700 cursor-pointer flex items-center gap-2">
+
+                  <li
+                    className="px-4 py-2 hover:bg-gray-700 cursor-pointer flex items-center gap-2"
+                    onClick={() => navigate("/user/change-password")}
+                  >
                     <KeyRound size={16} /> Change Password
                   </li>
+
                   <li
                     className="px-4 py-2 bg-red-600 hover:bg-red-700 cursor-pointer flex items-center gap-2"
                     onClick={logout}

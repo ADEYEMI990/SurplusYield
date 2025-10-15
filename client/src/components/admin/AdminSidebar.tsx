@@ -11,6 +11,8 @@ import {
   AlignJustify,
   Settings,
   X,
+  IdCard,
+  ClipboardList
 } from "lucide-react";
 
 const navItems = [
@@ -23,6 +25,8 @@ const navItems = [
   { label: "Navigation", to: "/admin/site/navigation", icon: List },
   { label: "Footer", to: "/admin/site/footer", icon: AlignJustify },
   { label: "Settings", to: "/admin/settings", icon: Settings },
+  { label: "Create KYC", to: "/admin/create-kyc", icon: IdCard },
+  { label: "All Kyc", to: "/admin/kyc", icon: ClipboardList },
 ];
 
 interface SidebarProps {

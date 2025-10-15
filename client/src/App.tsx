@@ -22,6 +22,9 @@ import DepositPage from "./components/user/Deposit";
 import PlansPage from "./pages/user/Plans";
 import WithdrawPage from "./pages/user/Withdraw";
 import TransactionsPage from "./pages/user/Transactions";
+import CreateKycPage from "./pages/admin/CreateKyc";
+import Kyc from "./pages/user/Kyc"
+import AllKycPage from "./pages/admin/AllKyc";
 
 function App() {
   return (
@@ -42,6 +45,8 @@ function App() {
               <Route path="site/navigation" element={<SiteNavigation />} />
               <Route path="site/footer" element={<SiteFooter />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="create-kyc" element={<CreateKycPage />} />
+              <Route path="kyc" element={<AllKycPage />} />
             </Route>
           </Route>
 
@@ -56,6 +61,7 @@ function App() {
               <Route path="plans" element={<PlansPage />} />
               <Route path="withdraw" element={<WithdrawPage />} />
               <Route path="transactions" element={<TransactionsPage />} />
+              <Route path="kyc" element={<Kyc />} />
             </Route>
           </Route>
         </Routes>
