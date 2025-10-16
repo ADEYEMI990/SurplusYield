@@ -13,7 +13,6 @@ import {
   TrendingUp,
   Gift,
   Users,
-  Calculator,
 } from "lucide-react";
 import useAuthStore from "../../stores/authStore";
 import { CardContent, CardHeader, CardTitle } from "../common/Card";
@@ -23,6 +22,7 @@ import Input from "../common/Input";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import API from "../../lib/api";
+import InvestmentCalculator from "./InvestmentCalculator";
 
 interface Transaction {
   _id: string;
@@ -79,13 +79,6 @@ export default function UserDashboard() {
     navigator.clipboard.writeText(referralCode);
     toast.success("Referral code copied!");
   };
-
-  // Calculator state
-  const [amount, setAmount] = useState(1000);
-  const [rate, setRate] = useState(10); // %
-  const [duration, setDuration] = useState(12); // months
-
-  const projected = ((amount * rate * duration) / 100).toFixed(2);
 
   // transactions
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -493,44 +486,8 @@ export default function UserDashboard() {
         </div>
       </div>
 
-      {/* CALCULATOR */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calculator className="w-5 h-5" /> Investment Calculator
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid md:grid-cols-4 gap-4">
-          <div>
-            <label className="text-sm">Amount</label>
-            <Input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(Number(e.target.value))}
-            />
-          </div>
-          <div>
-            <label className="text-sm">Rate (%)</label>
-            <Input
-              type="number"
-              value={rate}
-              onChange={(e) => setRate(Number(e.target.value))}
-            />
-          </div>
-          <div>
-            <label className="text-sm">Duration (months)</label>
-            <Input
-              type="number"
-              value={duration}
-              onChange={(e) => setDuration(Number(e.target.value))}
-            />
-          </div>
-          <div className="flex flex-col justify-center">
-            <span className="text-sm font-medium">Projected Return</span>
-            <span className="text-lg font-bold">${projected}</span>
-          </div>
-        </CardContent>
-      </Card>
+      {/* ===== INVESTMENT CALCULATOR ===== */}
+      <InvestmentCalculator />
       <hr />
       {/* Recent Transactions */}
       <Card>

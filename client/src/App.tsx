@@ -26,6 +26,8 @@ import CreateKycPage from "./pages/admin/CreateKyc";
 import Kyc from "./pages/user/Kyc"
 import AllKycPage from "./pages/admin/AllKyc";
 import ChangePasswordPage from "./pages/user/ChangePassword";
+import WalletPage from "./pages/admin/wallet";
+import WithdrawWalletPage from "./pages/admin/WithdrawWallet";
 
 function App() {
   return (
@@ -48,6 +50,8 @@ function App() {
               <Route path="settings" element={<Settings />} />
               <Route path="create-kyc" element={<CreateKycPage />} />
               <Route path="kyc" element={<AllKycPage />} />
+              <Route path="wallet" element={<WalletPage />} />
+              <Route path="withdraw-wallet" element={<WithdrawWalletPage />} />
             </Route>
           </Route>
 

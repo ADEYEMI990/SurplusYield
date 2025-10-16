@@ -1,21 +1,19 @@
-// server/src/models/Wallet.ts
-import mongoose, { Document, Schema } from "mongoose";
+import mongoose, { Schema, Document } from "mongoose";
 
 export interface IWallet extends Document {
-  user: mongoose.Types.ObjectId;
-  balance: number;
-  currency: string;
-  transactions: mongoose.Types.ObjectId[];
+  address: string;
+  updatedAt: Date;
 }
 
-const WalletSchema = new Schema<IWallet>(
+const walletSchema = new Schema<IWallet>(
   {
-    user: { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true },
-    balance: { type: Number, default: 0 },
-    currency: { type: String, default: "USD" },
-    transactions: [{ type: Schema.Types.ObjectId, ref: "Transaction" }],
+    address: {
+      type: String,
+      required: true,
+      trim: true,
+    },
   },
   { timestamps: true }
 );
 
-export default mongoose.model<IWallet>("Wallet", WalletSchema);
+export default mongoose.model<IWallet>("Wallet", walletSchema);

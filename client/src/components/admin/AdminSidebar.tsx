@@ -12,7 +12,8 @@ import {
   Settings,
   X,
   IdCard,
-  ClipboardList
+  ClipboardList,
+  Wallet
 } from "lucide-react";
 
 const navItems = [
@@ -27,6 +28,8 @@ const navItems = [
   { label: "Settings", to: "/admin/settings", icon: Settings },
   { label: "Create KYC", to: "/admin/create-kyc", icon: IdCard },
   { label: "All Kyc", to: "/admin/kyc", icon: ClipboardList },
+  { label: "Deposit Wallet", to: "/admin/wallet", icon: Wallet },
+  { label: "Withdraw Wallet", to: "/admin/withdraw-wallet", icon: Wallet },
 ];
 
 interface SidebarProps {

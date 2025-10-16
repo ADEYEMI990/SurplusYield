@@ -22,6 +22,8 @@ import { notFound, errorHandler } from "./middleware/errorMiddleware";
 import path from "path";
 import kycRoutes from "./routes/KycRoutes";
 import uploadRoutes from "./routes/uploadRoutes";
+import walletRoutes from "./routes/walletRoutes";
+import withdrawWalletRoutes from "./routes/withdrawWalletRoutes";
 
 dotenv.config();
 connectDB();
@@ -52,6 +54,8 @@ app.use("/api/site/footer", footerRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/kyc", kycRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/wallet", walletRoutes);
+app.use("/api/withdraw-wallet", withdrawWalletRoutes);
 
 // Error handling
 app.use(notFound);

@@ -9,6 +9,7 @@ import Button from "../common/Button";
 import { toast } from "react-toastify";
 
 interface User {
+  name: string;
   _id: string;
   username: string;
   email: string;
@@ -84,7 +85,7 @@ export default function AdminTransactions() {
     {
       key: "user",
       header: "User",
-      render: (row) => row.user?.username || "N/A",
+      render: (row) => row.user?.name || "N/A",
     },
     {
       key: "plan",
@@ -186,7 +187,7 @@ export default function AdminTransactions() {
                 </p>
                 <p className="text-sm">
                   <span className="font-semibold">User:</span>{" "}
-                  {t.user?.username || "N/A"}
+                  {t.user?.name || "N/A"}
                 </p>
                 <p className="text-sm">
                   <span className="font-semibold">Plan:</span>{" "}

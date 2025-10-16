@@ -1,5 +1,5 @@
 // client/src/components/user/Deposit.tsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import {
   Copy,
@@ -27,7 +27,21 @@ export default function Deposit() {
   const [referenceId, setReferenceId] = useState<string>("");
   const navigate = useNavigate();
 
-  const walletAddress = "1KgHhwLqj7ouYMFkxACxSh7r4v22sQsfwu";
+  const [walletAddress, setWalletAddress] = useState<string>("");
+
+   useEffect(() => {
+    const fetchWallet = async () => {
+      try {
+        const { data } = await API.get("/wallet");
+        setWalletAddress(data.address);
+      } catch {
+        toast.error("Failed to fetch wallet address");
+      }
+    };
+    fetchWallet();
+  }, []);
+
+  // const walletAddress = "1KgHhwLqj7ouYMFkxACxSh7r4v22sQsfwu";
 
   const handleProceed = () => {
     if (!amount || amount < 100) {
@@ -178,7 +192,7 @@ export default function Deposit() {
                   className="border border-gray-600 hover:border-gray-400 rounded-lg p-3 flex justify-between items-center cursor-pointer transition-colors"
                 >
                   <span className="truncate text-xs sm:text-sm">
-                    {walletAddress}
+                    {walletAddress || "Not set"}
                   </span>
                   {copied ? (
                     <CheckCircle2 className="text-green-500" size={20} />

@@ -1,75 +1,33 @@
-// server/src/controllers/walletController.ts
-import { Response } from "express";
+import { Request, Response } from "express";
 import Wallet from "../models/Wallet";
-import { Transaction } from "../models/Transaction";
 
-export const getWallet = async (req: any, res: Response) => {
+// GET wallet address
+export const getWallet = async (req: Request, res: Response) => {
   try {
-    const wallet = await Wallet.findOne({ user: req.user._id }).populate("transactions");
-    if (!wallet) {
-      return res.status(404).json({ message: "Wallet not found" });
-    }
+    const wallet = await Wallet.findOne();
+    if (!wallet) return res.status(404).json({ message: "Wallet not found" });
     res.json(wallet);
-  } catch (error) {
-    console.error("Error fetching wallet:", error);
-    res.status(500).json({ message: "Error fetching wallet" });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-export const deposit = async (req: any, res: Response) => {
+// UPDATE or CREATE wallet address
+export const updateWallet = async (req: Request, res: Response) => {
   try {
-    const { amount } = req.body;
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ message: "Invalid deposit amount" });
+    const { address } = req.body;
+    if (!address) return res.status(400).json({ message: "Address is required" });
+
+    let wallet = await Wallet.findOne();
+    if (wallet) {
+      wallet.address = address;
+      await wallet.save();
+    } else {
+      wallet = await Wallet.create({ address });
     }
 
-    let wallet = await Wallet.findOne({ user: req.user._id });
-    if (!wallet) {
-      wallet = await Wallet.create({ user: req.user._id, balance: 0 });
-    }
-
-    wallet.balance += amount;
-    await wallet.save();
-
-    await Transaction.create({
-      user: req.user._id,
-      type: "deposit",
-      amount,
-      status: "completed",
-    });
-    
-    res.json({ message: "Deposit successful", balance: wallet.balance });
-  } catch (error) {
-    console.error("Deposit error:", error);
-    res.status(500).json({ message: "Error processing deposit" });
-  }
-};
-
-export const withdraw = async (req: any, res: Response) => {
-  try {
-    const { amount } = req.body;
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ message: "Invalid withdraw amount" });
-    }
-
-    let wallet = await Wallet.findOne({ user: req.user._id });
-    if (!wallet || wallet.balance < amount) {
-      return res.status(400).json({ message: "Insufficient balance" });
-    }
-
-    wallet.balance -= amount;
-    await wallet.save();
-
-    await Transaction.create({
-      user: req.user._id,
-      type: "withdraw",
-      amount,
-      status: "pending", // require admin approval
-    });
-
-    res.json({ message: "Withdrawal request submitted", balance: wallet.balance });
-  } catch (error) {
-    console.error("Withdraw error:", error);
-    res.status(500).json({ message: "Error processing withdrawal" });
+    res.json({ message: "Wallet updated successfully", wallet });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
   }
 };

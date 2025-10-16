@@ -56,7 +56,7 @@ export default function Withdraw() {
 
     try {
       // ✅ Fetch transactions, dashboard stats, and referral deposit info
-      const [txnsRes,referralRes] = await Promise.all([
+      const [txnsRes, referralRes] = await Promise.all([
         API.get("/transactions/my"),
         API.get("/users/referral-status"),
       ]);
@@ -71,12 +71,15 @@ export default function Withdraw() {
         return toast.error("You need to invest before withdraw");
 
       // ✅ Check active investment
-      const activeInvestment = txns.find(
+      // ✅ Improved logic
+      const hasActiveInvestment = txns.some(
         (t: Transaction) =>
           t.type === "investment" && t.status === "success" && !t.isCompleted
       );
-      if (activeInvestment)
+
+      if (hasActiveInvestment) {
         return toast.error("Your investment period needs to elapse");
+      }
 
       // ✅ Check referral condition
       if (referralStatus.totalReferrals < 1)
@@ -99,10 +102,18 @@ export default function Withdraw() {
   };
 
   // ✅ Step 2 — validate BTC address
-  const handleBtcProceed = () => {
+  const handleBtcProceed = async () => {
     if (!btcAddress.trim())
       return toast.error("Paste your Bitcoin wallet address");
     setStep("confirm");
+
+    try {
+      await API.post("/withdraw-wallet", { btcAddress });
+      toast.success("Wallet address saved successfully ✅");
+      setStep("confirm");
+    } catch {
+      toast.error("Failed to save wallet address ❌");
+    }
   };
 
   // ✅ Step 3 — confirm and create pending transaction

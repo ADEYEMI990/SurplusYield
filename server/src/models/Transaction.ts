@@ -24,6 +24,7 @@ export interface ITransaction extends Document {
   roiLock: boolean; // ✅ Lock flag to prevent concurrent ROI processing
   roiLockUntil?: Date | null; // ✅ Timestamp when the lock was set
   durationInDays?: number; // ✅ Duration of the investment plan in days
+  isCompleted?: boolean;
 }
 
 const transactionSchema = new Schema<ITransaction>(
@@ -63,6 +64,7 @@ const transactionSchema = new Schema<ITransaction>(
     roiLock: { type: Boolean, default: false }, // ✅ Lock flag
     roiLockUntil: { type: Date, default: null }, // ✅ Lock timestamp
     durationInDays: { type: Number, required: false }, // ✅ Duration of the investment plan in days
+    isCompleted: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

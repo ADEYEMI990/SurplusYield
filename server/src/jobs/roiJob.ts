@@ -155,6 +155,8 @@ async function processROICredit() {
 
         if (txn.nextPayoutAt >= endDate) {
           txn.status = "completed";
+          txn.isCompleted = true;
+
 
           const alreadyReturned = await Transaction.exists({
             user: user._id,
