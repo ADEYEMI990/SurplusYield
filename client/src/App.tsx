@@ -25,6 +25,7 @@ import TransactionsPage from "./pages/user/Transactions";
 import CreateKycPage from "./pages/admin/CreateKyc";
 import Kyc from "./pages/user/Kyc"
 import AllKycPage from "./pages/admin/AllKyc";
+import ChangePasswordPage from "./pages/user/ChangePassword";
 
 function App() {
   return (
@@ -62,6 +63,7 @@ function App() {
               <Route path="withdraw" element={<WithdrawPage />} />
               <Route path="transactions" element={<TransactionsPage />} />
               <Route path="kyc" element={<Kyc />} />
+              <Route path="change-password" element={<ChangePasswordPage />} />
             </Route>
           </Route>
         </Routes>
