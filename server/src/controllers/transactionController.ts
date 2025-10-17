@@ -6,6 +6,7 @@ import { applyTransactionToWalletAtomic } from "../utils/walletUtils";
 import mongoose from "mongoose";
 import User from "../models/User";
 import { Plan } from "../models/Plan";
+import { sendNotification } from "../utils/notify";
 import path from "path";
 import fs from "fs";
 
@@ -65,12 +66,24 @@ export const createTransaction = asyncHandler(
         if (user) {
           if (type === "deposit" || type === "bonus") {
             user.mainWallet += Number(amount);
+            await sendNotification(
+              String(user._id),
+              "Deposit Successful",
+              `Your deposit of $${amount} was successful.`,
+              "transaction"
+            );
           } else if (type === "withdrawal") {
             if (user.mainWallet < Number(amount)) {
               res.status(400);
               throw new Error("Insufficient balance for withdrawal");
             }
             user.mainWallet -= Number(amount);
+            await sendNotification(
+              String(user._id),
+              "Withdrawal Processed",
+              `Your withdrawal of $${amount} has been processed.`,
+              "transaction"
+            );
           }
           await user.save();
         }
@@ -161,6 +174,13 @@ export const createTransaction = asyncHandler(
       await user.save({ session });
       await session.commitTransaction();
       session.endSession();
+
+      await sendNotification(
+        String(user._id),
+        "Investment Created",
+        `You have successfully invested $${amount} in ${planData.name}.`,
+        "investment"
+      );
 
       res.status(201).json({
         success: true,

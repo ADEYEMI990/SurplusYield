@@ -34,16 +34,69 @@ interface Transaction {
   reference: string;
 }
 
+interface Notification {
+  _id: string;
+  title: string;
+  message: string;
+  type: "transaction" | "investment" | "kyc" | "security" | string;
+  createdAt: string;
+  read?: boolean;
+}
+
 export default function UserDashboard() {
   // Define the expected user type
 
   const { user, logout } = useAuthStore();
   console.log("DASHBOARD USER:", user);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const notificationsRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  const fetchNotifications = async () => {
+    try {
+      const { data } = await API.get("/notifications");
+      setNotifications(data);
+
+      // ✅ Count how many are unread
+      const unread = data.filter((n: Notification) => !n.read).length;
+      setUnreadCount(unread);
+    } catch {
+      console.error("Failed to fetch notifications");
+    }
+  };
+
+  // ✅ Auto-refresh notifications every 1 minute
+useEffect(() => {
+  // Initial fetch on mount
+  fetchNotifications();
+
+  // Then refresh every 1 minute
+  const interval = setInterval(fetchNotifications, 60 * 1000);
+
+  // Cleanup on unmount
+  return () => clearInterval(interval);
+}, []);
+
+
+  useEffect(() => {
+    if (showNotifications) {
+      (async () => {
+      try {
+        await API.patch("/notifications/mark-all");
+        await fetchNotifications(); // Refresh after marking all read
+        setUnreadCount(0);
+      } catch (err) {
+        console.error("Failed to mark all as read:", err);
+      }
+    })();
+    }
+  }, [showNotifications]);
+
+  
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -266,16 +319,48 @@ export default function UserDashboard() {
         <div className="flex items-center gap-4 relative">
           {/* Notifications */}
           <div ref={notificationsRef} className="relative">
-            <Bell
-              className="cursor-pointer"
+            <div
+              className="relative cursor-pointer"
               onClick={() => {
                 setShowNotifications((s) => !s);
-                setShowProfileMenu(false); // ✅ close profile when opening notifications
+                setShowProfileMenu(false);
               }}
-            />
+            >
+              <Bell className="w-6 h-6 text-gray-700" />
+
+              {unreadCount > 0 && (
+                <span
+                  className="
+                    absolute -top-1 -right-1 bg-red-600 text-white text-[10px]
+                    font-bold rounded-full w-4 h-4 flex items-center justify-center
+                    border border-white
+                  "
+                >
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </div>
+
             {showNotifications && (
-              <div className="absolute right-0 mt-2 w-64 bg-white shadow rounded p-3">
-                <p className="text-sm text-gray-600">No new notifications</p>
+              <div className="absolute right-0 mt-2 w-72 bg-white shadow-lg rounded-lg p-3 max-h-80 overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <p className="text-sm text-gray-600">No new notifications</p>
+                ) : (
+                  notifications.map((n) => (
+                    <div
+                      key={n._id}
+                      className={`p-2 mb-1 rounded ${
+                        n.read ? "bg-gray-50" : "bg-blue-50"
+                      }`}
+                    >
+                      <p className="font-medium text-sm">{n.title}</p>
+                      <p className="text-xs text-gray-600">{n.message}</p>
+                      <p className="text-[10px] text-gray-400">
+                        {new Date(n.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  ))
+                )}
               </div>
             )}
           </div>

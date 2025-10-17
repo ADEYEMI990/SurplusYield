@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
 import { KycForm, KycSubmission } from "../models/kyc";
 import User from "../models/User";
+import { sendNotification } from "../utils/notify";
 
 /* ===================== ADMIN ===================== */
 
@@ -257,6 +258,15 @@ export const updateKycStatus = asyncHandler(
 
     // update user profile KYC status
     await User.findByIdAndUpdate(kyc.user, { kycStatus: status });
+
+    await sendNotification(
+      kyc.user.toString(),
+      `KYC ${status === "approved" ? "Approved" : "Rejected"}`,
+      status === "approved"
+        ? "Your KYC has been successfully approved."
+        : `Your KYC was rejected. ${reason ? `Reason: ${reason}` : ""}`,
+      "kyc"
+    );
 
     res.json({ message: `KYC ${status}` });
   }

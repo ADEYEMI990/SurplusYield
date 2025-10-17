@@ -6,6 +6,7 @@ import User from "../models/User";
 import Admin from "../models/Admin";
 import { Transaction } from "../models/Transaction";
 import mongoose from "mongoose";
+import { sendNotification } from "../utils/notify";
 
 // Helper: strong password validation
 function isStrongPassword(password: string): boolean {
@@ -244,6 +245,14 @@ export const changePassword = asyncHandler(async (req: any, res: Response) => {
   user.password = await bcrypt.hash(newPassword, salt);
   await user.save();
 
+  await sendNotification(
+  String(user._id),
+  "Password Changed",
+  "Your account password has been updated successfully.",
+  "security"
+);
+
+
   res.status(200).json({ message: "Password changed successfully" });
 });
 
@@ -255,6 +264,14 @@ export const registerAdmin = async (req: Request, res: Response) => {
     if (!username || !email || !password) {
       res.status(400);
       throw new Error("Please include all fields");
+    }
+
+    // Validate password strength
+    if (!isStrongPassword(password)) {
+      res.status(400);
+      throw new Error(
+        "Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character"
+      );
     }
 
     // check if email exists

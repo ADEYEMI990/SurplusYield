@@ -5,6 +5,7 @@ import chalk from "chalk";
 import { Transaction } from "../models/Transaction";
 import User from "../models/User";
 import connectDB from "../config/db";
+import { sendNotification } from "../utils/notify";
 
 console.log(chalk.greenBright("✅ ROI Cron Job Initialized (Debug Mode)"));
 
@@ -75,9 +76,9 @@ async function processROICredit() {
       } else {
         console.log(
           chalk.gray(
-            `⏩ Skipping ${user?.email || "unknown user"} (${txn._id}):\n  - ${reasons.join(
-              "\n  - "
-            )}`
+            `⏩ Skipping ${user?.email || "unknown user"} (${
+              txn._id
+            }):\n  - ${reasons.join("\n  - ")}`
           )
         );
       }
@@ -143,6 +144,13 @@ async function processROICredit() {
 
         await Transaction.insertMany(roiRecords, { session });
 
+        await sendNotification(
+          String(user._id),
+          "ROI Credited",
+          `You just earned $${totalProfit.toFixed(2)} in ROI.`,
+          "investment"
+        );
+
         // Update investment record
         txn.roiEarned += totalProfit;
         txn.lastRoiAt = now;
@@ -156,7 +164,6 @@ async function processROICredit() {
         if (txn.nextPayoutAt >= endDate) {
           txn.status = "completed";
           txn.isCompleted = true;
-
 
           const alreadyReturned = await Transaction.exists({
             user: user._id,
@@ -185,7 +192,16 @@ async function processROICredit() {
               { session }
             );
 
-            console.log(chalk.greenBright(`💸 Capital returned to ${user.email}`));
+            console.log(
+              chalk.greenBright(`💸 Capital returned to ${user.email}`)
+            );
+
+            await sendNotification(
+              String(user._id),
+              "Capital Returned",
+              `Your investment of $${txn.amount} has matured, and capital has been returned.`,
+              "investment"
+            );
           }
         }
 
