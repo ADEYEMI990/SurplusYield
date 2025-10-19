@@ -1,8 +1,46 @@
 @import "tailwindcss";
 
+@keyframes float1 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(30px, 40px) scale(1.1);
+  }
+}
 
-/* @tailwind base;
-@tailwind components;
+@keyframes float2 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-40px, 20px) scale(1.05);
+  }
+}
+
+@keyframes float3 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(25px, -35px) scale(1.08);
+  }
+}
+
+.animate-float1 {
+  animation: float1 12s ease-in-out infinite;
+}
+
+.animate-float2 {
+  animation: float2 14s ease-in-out infinite;
+}
+
+.animate-float3 {
+  animation: float3 16s ease-in-out infinite;
+}
+
+
+/* 🧩 Keep Tailwind’s base, components, and utilities active */
 @tailwind utilities;
 
 /* Optional: custom scrollbar for sidebar */

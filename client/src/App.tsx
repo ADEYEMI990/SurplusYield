@@ -28,6 +28,8 @@ import AllKycPage from "./pages/admin/AllKyc";
 import ChangePasswordPage from "./pages/user/ChangePassword";
 import WalletPage from "./pages/admin/wallet";
 import WithdrawWalletPage from "./pages/admin/WithdrawWallet";
+import LandingPage from "./pages/user/LandingPage";
+import CreatePage from "./pages/admin/Create";
 
 function App() {
   return (
@@ -52,12 +54,14 @@ function App() {
               <Route path="kyc" element={<AllKycPage />} />
               <Route path="wallet" element={<WalletPage />} />
               <Route path="withdraw-wallet" element={<WithdrawWalletPage />} />
+              <Route path="create" element={<CreatePage />} />
             </Route>
           </Route>
 
           {/* User auth */}
           <Route path="/auth/login" element={<LoginUser />} />
           <Route path="/auth/register" element={<SignupUser />} />
+          <Route path="/" element={<LandingPage />} />
           {/* Protected User routes */}
           <Route path="/user" element={<UserProtected />}>
             <Route element={<UserLayout />}>
