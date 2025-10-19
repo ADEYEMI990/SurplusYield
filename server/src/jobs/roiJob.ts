@@ -61,8 +61,11 @@ async function processROICredit() {
         endDate.getDate() + (txn.durationInDays || plan?.durationInDays || 0)
       );
 
-      if (txn.status === "completed" || now >= endDate)
-        reasons.push("🏁 Investment matured or completed.");
+      if (txn.status === "completed")
+        reasons.push("🏁 Investment already completed.");
+      // Only skip if endDate has passed *and* the next payout is beyond endDate
+      else if (txn.nextPayoutAt && txn.nextPayoutAt > endDate)
+        reasons.push("🏁 Investment fully matured (past all payout cycles).");
 
       if (!txn.nextPayoutAt) reasons.push("⚠️ nextPayoutAt is missing.");
       else if (txn.nextPayoutAt > now)
@@ -116,12 +119,41 @@ async function processROICredit() {
             ? 1000 * 60 * 60 * 24 * 7
             : 1000 * 60 * 60 * 24; // daily default
 
+        // ✅ NEW: Cap missedCycles to totalPossibleCycles
+        const totalPossibleCycles =
+          plan.returnPeriod === "hour"
+            ? plan.durationInDays * 24
+            : plan.returnPeriod === "daily"
+            ? plan.durationInDays
+            : plan.returnPeriod === "weekly"
+            ? Math.ceil(plan.durationInDays / 7)
+            : 1;
+
         const timeDiff = now.getTime() - txn.nextPayoutAt.getTime();
-        const missedCycles = Math.max(1, Math.floor(timeDiff / intervalMs));
+        const rawCycles = Math.floor(timeDiff / intervalMs) + 1;
+        const missedCycles = Math.min(
+          Math.max(1, rawCycles),
+          totalPossibleCycles
+        );
         const roiValue = plan.roiValue || 0;
 
         const profitPerCycle =
           plan.roiUnit === "%" ? (txn.amount * roiValue) / 100 : roiValue;
+
+        // ✅ NEW: Prevent ROI beyond full duration
+        const expectedTotalROI = profitPerCycle * totalPossibleCycles;
+        if (txn.roiEarned >= expectedTotalROI) {
+          console.log(
+            chalk.gray(
+              `⏩ Skipping ${user.email}: already earned full ROI ($${txn.roiEarned}).`
+            )
+          );
+          txn.status = "completed";
+          await txn.save({ session });
+          await session.commitTransaction();
+          session.endSession();
+          continue;
+        }
 
         const totalProfit = profitPerCycle * missedCycles;
 
@@ -161,7 +193,7 @@ async function processROICredit() {
           endDate.getDate() + (txn.durationInDays || plan.durationInDays || 0)
         );
 
-        if (txn.nextPayoutAt >= endDate) {
+        if (txn.nextPayoutAt > endDate) {
           txn.status = "completed";
           txn.isCompleted = true;
 
@@ -171,7 +203,14 @@ async function processROICredit() {
             type: "capitalReturn",
           });
 
-          if (!alreadyReturned) {
+          const expectedTotalRoi =
+            plan.roiUnit === "%"
+              ? (txn.amount * plan.roiValue * plan.durationInDays) / 100
+              : plan.roiValue * plan.durationInDays;
+
+          const roiCappedEarly = txn.roiEarned >= expectedTotalRoi * 0.99; // tolerance for rounding
+
+          if (!alreadyReturned && !roiCappedEarly) {
             await User.updateOne(
               { _id: user._id },
               { $inc: { mainWallet: txn.amount } },
@@ -201,6 +240,12 @@ async function processROICredit() {
               "Capital Returned",
               `Your investment of $${txn.amount} has matured, and capital has been returned.`,
               "investment"
+            );
+          } else if (roiCappedEarly) {
+            console.log(
+              chalk.yellowBright(
+                `⚠️ Skipping capital return for ${user.email} — ROI already capped early.`
+              )
             );
           }
         }
