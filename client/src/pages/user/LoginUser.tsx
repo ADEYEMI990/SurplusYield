@@ -6,6 +6,7 @@ import useAuthStore from "../../stores/authStore";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { Eye, EyeOff } from "lucide-react";
+import { assets } from "../../assets/assets";
 
 import Card, {
   CardHeader,
@@ -49,8 +50,13 @@ export default function LoginUser() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-8">
       <Card className="w-full max-w-sm sm:max-w-md md:max-w-lg shadow-md rounded-xl">
         <CardHeader className="text-center pb-2">
-          <CardTitle className="text-2xl font-semibold text-gray-800">
-            User Login
+          <CardTitle className="text-2xl flex justify-center items-center gap-3 font-semibold text-gray-800">
+            <img
+              src={assets.SY}
+              alt="Logo"
+              className="w-7 h-7 rounded bg-gray-800 translate-y-[1px]"
+            />
+            <span className="tracking-wide"> User Login </span>
           </CardTitle>
           <p className="mt-1 text-sm text-gray-500">
             Welcome back! Please sign in to continue.

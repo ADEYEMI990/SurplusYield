@@ -14,6 +14,7 @@ import Card, {
 } from "../../components/common/Card";
 import Input from "../../components/common/Input";
 import Button from "../../components/common/Button";
+import { assets } from "../../assets/assets";
 
 export default function SignupUser() {
   const [firstName, setFirstName] = useState("");
@@ -28,7 +29,6 @@ export default function SignupUser() {
   const setAuth = useAuthStore((s) => s.setAuth);
   const navigate = useNavigate();
   const [referralCode, setReferralCode] = useState("");
-  
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,8 +73,13 @@ export default function SignupUser() {
     <div className="min-h-screen flex items-center justify-center  bg-gray-100 px-4 sm:px-6 py-8">
       <Card className="w-full max-w-md shadow-lg rounded-xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-lg sm:text-xl font-bold">
-            Signup
+          <CardTitle className="text-lg flex justify-center items-center gap-3 sm:text-xl font-bold">
+            <img
+              src={assets.SY}
+              alt="Logo"
+              className="w-7 h-7 rounded bg-gray-800 translate-y-[1px]"
+            />
+            <span className="tracking-wide">Signup</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
