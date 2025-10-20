@@ -5,6 +5,12 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+
+  // ✅ Keep default build output directory
+  build: {
+    outDir: 'dist', // Vite default (safe for Render)
+  },
+
   server: {
     proxy: {
       "/api": {
