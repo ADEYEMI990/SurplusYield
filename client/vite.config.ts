@@ -8,12 +8,12 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "http://localhost:5000", // your backend server
+        target: "https://surplusyield.onrender.com", // your backend server
         changeOrigin: true,
         secure: false,
       },
       "/uploads": {
-        target: "http://localhost:5000", // serve uploaded images from backend
+        target: "https://surplusyield.onrender.com", // serve uploaded images from backend
         changeOrigin: true,
         secure: false,
       },
