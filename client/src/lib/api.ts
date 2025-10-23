@@ -3,7 +3,10 @@ import axios from "axios";
 import useAuthStore from "../stores/authStore";
 
 const API = axios.create({
-  baseURL: "/api", // thanks to your Vite proxy, this points to localhost:5000 in dev
+  baseURL:
+    import.meta.env.MODE === "development"
+      ? "http://localhost:5000/api" // ✅ Local dev backend
+      : "https://surplusyield.onrender.com/api", // ✅ Your Render backend
 });
 
 // Attach token automatically

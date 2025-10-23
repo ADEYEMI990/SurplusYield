@@ -17,12 +17,12 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://surplusyield.onrender.com',
+        target: 'https://surplusyield.onrender.com/api',
         changeOrigin: true,
         secure: false,
       },
       '/uploads': {
-        target: 'https://surplusyield.onrender.com',
+        target: 'https://surplusyield.onrender.com/uploads',
         changeOrigin: true,
         secure: false,
       },
