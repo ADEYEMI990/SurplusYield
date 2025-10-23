@@ -11,6 +11,7 @@ export default defineConfig({
 
   build: {
     outDir: 'dist', // Vite default
+    sourcemap: true, // 👈 add this
   },
 
   server: {
