@@ -6,6 +6,7 @@ import Table from "../../components/common/Table";
 import PlanForm from "../../components/admin/PlanForm";
 import { toast } from "react-toastify";
 import type { Plan } from "../../types/plan";
+import { getImageUrl } from "../../utils/getImageUrl";
 
 export default function PlansPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -100,7 +101,7 @@ export default function PlansPage() {
             render: (plan) =>
               plan.icon ? (
                 <img
-                  src={plan.icon}
+                  src={getImageUrl(plan.icon)}
                   alt={plan.name}
                   className="w-10 h-10 rounded-full border object-cover"
                 />
