@@ -1,3 +1,5 @@
+// client/src/App.tsx
+
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AdminLayout from "./layouts/AdminLayout";
 import Dashboard from "./pages/admin/Dashboard";

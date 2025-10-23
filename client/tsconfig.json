@@ -1,3 +1,5 @@
+// client/tsconfig.json
+
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "files": [],

@@ -1,3 +1,5 @@
+// client/src/main.tsx
+
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { ToastProvider } from "./components/common/ToastProvider";
