@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import useAuthStore from "../../stores/authStore";
+import API from "../../lib/api";
 
 const schema = yup.object().shape({
   email: yup.string().email().required(),
@@ -21,7 +22,7 @@ export default function AdminLogin() {
 
   const mutation = useMutation({
     mutationFn: (data: FormData) =>
-      axios.post("/api/auth/login-admin", data).then((res) => res.data),
+      API.post("/auth/login-admin", data).then((res) => res.data),
     onSuccess: (data) => {
       console.log("Login response:", data);
       setAuth({ user: data.admin, token: data.token, role: "admin" });
