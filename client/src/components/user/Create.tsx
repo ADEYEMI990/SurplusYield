@@ -41,8 +41,20 @@ export default function UserCreate() {
         API.get("/spotlights?type=investment"),
         API.get("/spotlights?type=withdraw"),
       ]);
-      setInvestments(invRes.data || []);
-      setWithdraws(wRes.data || []);
+
+      // ✅ Ensure arrays no matter the response shape
+    const invData = Array.isArray(invRes.data)
+      ? invRes.data
+      : invRes.data?.data || [];
+    const wData = Array.isArray(wRes.data)
+      ? wRes.data
+      : wRes.data?.data || [];
+
+      setInvestments(invData);
+      setWithdraws(wData);
+
+      console.log("Investment Response:", invRes.data);
+      console.log("Withdraw Response:", wRes.data);
     } catch (err) {
       console.error(err);
     } finally {
