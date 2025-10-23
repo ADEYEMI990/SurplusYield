@@ -103,6 +103,12 @@ export const registerUser = asyncHandler(
         { session }
       );
 
+      await sendNotification(
+        String(user._id),
+        "Welcome to SurplusYield!",
+        "Your account has been created successfully, and a signup bonus of $20 has been credited to your profit wallet.",
+      );
+
       // 🔹 Handle referral AFTER user creation is successful
       if (providedReferral) {
         referrer = await User.findOne({
@@ -131,6 +137,12 @@ export const registerUser = asyncHandler(
               },
             ],
             { session }
+          );
+
+          await sendNotification(
+            String(referrer._id),
+            "Referral Bonus Earned!",
+            `You have earned a referral bonus of $${referralBonusAmount} for referring a new user.`,
           );
         }
       }

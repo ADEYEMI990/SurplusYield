@@ -1,13 +1,15 @@
 // server/src/jobs/roiJob.ts
 import cron from "node-cron";
-import mongoose, { ClientSession } from "mongoose";
+import mongoose from "mongoose";
 import chalk from "chalk";
 import { Transaction } from "../models/Transaction";
 import User from "../models/User";
 import connectDB from "../config/db";
 import { sendNotification } from "../utils/notify";
 
-console.log(chalk.greenBright("✅ ROI Cron Job Initialized (Debug Mode)"));
+console.log(
+  chalk.greenBright("✅ ROI Cron Job Initialized (Verbose Debug Mode)")
+);
 
 let retrying = false;
 
@@ -40,19 +42,16 @@ async function processROICredit() {
       chalk.blueBright(`📦 Found ${allInvestments.length} total investment(s).`)
     );
 
-    const eligibleInvestments = [];
+    const eligibleInvestments: any[] = [];
 
-    // --- Debug Filtering Pass ---
+    // --- Filtering ---
     for (const txn of allInvestments) {
       const plan: any = txn.plan;
       const user: any = txn.user;
-
       const reasons: string[] = [];
 
       if (!plan || !user) reasons.push("❌ Missing plan or user reference.");
-
       if (txn.roiLock) reasons.push("🔒 ROI lock enabled.");
-
       if (!["success", "pending"].includes(txn.status))
         reasons.push(`🚫 Invalid status: ${txn.status}`);
 
@@ -63,17 +62,16 @@ async function processROICredit() {
 
       if (txn.status === "completed")
         reasons.push("🏁 Investment already completed.");
-      // Only skip if endDate has passed *and* the next payout is beyond endDate
       else if (txn.nextPayoutAt && txn.nextPayoutAt > endDate)
-        reasons.push("🏁 Investment fully matured (past all payout cycles).");
+        reasons.push("🏁 Fully matured (past all payout cycles).");
 
-      if (!txn.nextPayoutAt) reasons.push("⚠️ nextPayoutAt is missing.");
-      else if (txn.nextPayoutAt > now)
+      if (!txn.nextPayoutAt) reasons.push("⚠️ nextPayoutAt missing.");
+      else if (txn.nextPayoutAt.getTime() - now.getTime() > 5000)
+        // 5 sec grace
         reasons.push(
-          `🕒 ROI not due yet (next at ${txn.nextPayoutAt.toISOString()})`
+          `🕒 ROI not due yet (next payout at ${txn.nextPayoutAt.toISOString()})`
         );
 
-      // ✅ If no skip reason, mark eligible
       if (reasons.length === 0) {
         eligibleInvestments.push(txn);
       } else {
@@ -87,12 +85,9 @@ async function processROICredit() {
       }
     }
 
-    // --- Process eligible investments ---
     if (eligibleInvestments.length === 0) {
       console.log(
-        chalk.gray(
-          "ℹ️ No eligible investments found for ROI processing after debug filtering."
-        )
+        chalk.gray("ℹ️ No eligible investments found for ROI processing.")
       );
       return;
     }
@@ -119,7 +114,6 @@ async function processROICredit() {
             ? 1000 * 60 * 60 * 24 * 7
             : 1000 * 60 * 60 * 24; // daily default
 
-        // ✅ NEW: Cap missedCycles to totalPossibleCycles
         const totalPossibleCycles =
           plan.returnPeriod === "hour"
             ? plan.durationInDays * 24
@@ -129,23 +123,77 @@ async function processROICredit() {
             ? Math.ceil(plan.durationInDays / 7)
             : 1;
 
-        const timeDiff = now.getTime() - txn.nextPayoutAt.getTime();
-        const rawCycles = Math.floor(timeDiff / intervalMs) + 1;
-        const missedCycles = Math.min(
-          Math.max(1, rawCycles),
-          totalPossibleCycles
-        );
         const roiValue = plan.roiValue || 0;
-
         const profitPerCycle =
           plan.roiUnit === "%" ? (txn.amount * roiValue) / 100 : roiValue;
+        const timeDiff = now.getTime() - txn.nextPayoutAt.getTime();
+        let rawCycles = Math.floor(timeDiff / intervalMs);
 
-        // ✅ NEW: Prevent ROI beyond full duration
+        // // ✅ If payout is exactly due or slightly after, count as 1 cycle
+        // if (rawCycles < 1 && now >= txn.nextPayoutAt) rawCycles = 1;
+
+        // // Automatically catch up all overdue cycles until now
+        // const elapsedSinceStart = now.getTime() - txn.createdAt.getTime();
+        // const totalElapsedCycles = Math.floor(elapsedSinceStart / intervalMs);
+        // const expectedCyclesPaid = Math.floor(txn.roiEarned / profitPerCycle);
+        // rawCycles = totalElapsedCycles - expectedCyclesPaid;
+
+        // // Clamp within valid range
+        // if (rawCycles < 0) rawCycles = 0;
+        // if (rawCycles > totalPossibleCycles - expectedCyclesPaid)
+        //   rawCycles = totalPossibleCycles - expectedCyclesPaid;
+
+        // // ✅ Ensure missedCycles never exceeds totalPossibleCycles
+        // const missedCycles = Math.min(rawCycles, totalPossibleCycles - expectedCyclesPaid);
+
+        // ✅ Gracefully catch up missed ROI cycles even if cron ran late
+        const elapsedSinceStart =
+          now.getTime() - new Date(txn.createdAt).getTime();
+        const totalElapsedCycles = Math.floor(elapsedSinceStart / intervalMs);
+        const expectedCyclesPaid = Math.floor(txn.roiEarned / profitPerCycle);
+
+        let missedCycles = totalElapsedCycles - expectedCyclesPaid;
+
+        // Clamp missedCycles within valid range
+        if (missedCycles < 0) missedCycles = 0;
+        if (missedCycles > totalPossibleCycles - expectedCyclesPaid)
+          missedCycles = totalPossibleCycles - expectedCyclesPaid;
+
+        if (missedCycles > 0) {
+          console.log(
+            chalk.yellowBright(
+              `⚠️ Catching up ${missedCycles} missed ROI cycle(s) for ${txn.user?.email}`
+            )
+          );
+        }
+
         const expectedTotalROI = profitPerCycle * totalPossibleCycles;
+
+        // Calculate ROI that will be earned now
+        const totalProfit = profitPerCycle * missedCycles;
+
+        // Calculate updated ROI after credit
+        const updatedRoiEarned = txn.roiEarned + totalProfit;
+
+        // ✅ Correct remaining ROI and progress
+        const totalRemainingROI = Math.max(
+          expectedTotalROI - updatedRoiEarned,
+          0
+        );
+        const progressPercent = (
+          (updatedRoiEarned / expectedTotalROI) *
+          100
+        ).toFixed(2);
+
+        // --- Skip if fully paid ---
         if (txn.roiEarned >= expectedTotalROI) {
           console.log(
             chalk.gray(
-              `⏩ Skipping ${user.email}: already earned full ROI ($${txn.roiEarned}).`
+              `⏩ Skipping ${
+                user.email
+              }: fully earned ROI ($${txn.roiEarned.toFixed(
+                2
+              )} / $${expectedTotalROI.toFixed(2)})`
             )
           );
           txn.status = "completed";
@@ -155,9 +203,9 @@ async function processROICredit() {
           continue;
         }
 
-        const totalProfit = profitPerCycle * missedCycles;
+        // const totalProfit = profitPerCycle * missedCycles;
 
-        // 👛 Credit user’s profit wallet
+        // 👛 Update profit wallet
         await User.updateOne(
           { _id: user._id },
           { $inc: { profitWallet: totalProfit } },
@@ -176,6 +224,7 @@ async function processROICredit() {
 
         await Transaction.insertMany(roiRecords, { session });
 
+        // 📬 Notify user
         await sendNotification(
           String(user._id),
           "ROI Credited",
@@ -183,8 +232,13 @@ async function processROICredit() {
           "investment"
         );
 
-        // Update investment record
+        // --- Update investment fields ---
         txn.roiEarned += totalProfit;
+        // Calculate remaining cycles
+        const remainingCycles = Math.max(
+          totalPossibleCycles - (txn.roiEarned / profitPerCycle || 0),
+          0
+        ).toFixed(2);
         txn.lastRoiAt = now;
         txn.nextPayoutAt = new Date(now.getTime() + intervalMs);
 
@@ -193,58 +247,119 @@ async function processROICredit() {
           endDate.getDate() + (txn.durationInDays || plan.durationInDays || 0)
         );
 
-        if (txn.nextPayoutAt > endDate) {
+        // --- Detailed ROI log ---
+        console.log(chalk.magentaBright("\n📘 ROI DETAILS"));
+        console.log(chalk.white(`Investor: ${user.email}`));
+        console.log(chalk.white(`Plan: ${plan.name || plan._id}`));
+        console.log(
+          chalk.white(`Investment Amount: $${txn.amount.toFixed(2)}`)
+        );
+        console.log(
+          chalk.white(`ROI Value per cycle: $${profitPerCycle.toFixed(2)}`)
+        );
+        console.log(chalk.white(`Cycles Credited Now: ${missedCycles}`));
+        console.log(
+          chalk.white(`Total Possible Cycles: ${totalPossibleCycles}`)
+        );
+        console.log(chalk.white(`Remaining Cycles: ${remainingCycles}`));
+        console.log(chalk.white(`missed Cycles: ${missedCycles}`));
+        console.log(
+          chalk.white(`ROI Earned So Far: $${txn.roiEarned.toFixed(2)}`)
+        );
+        console.log(
+          chalk.white(`Expected Total ROI: $${expectedTotalROI.toFixed(2)}`)
+        );
+        console.log(
+          chalk.white(`Remaining ROI: $${totalRemainingROI.toFixed(2)}`)
+        );
+        console.log(chalk.white(`Progress: ${progressPercent}%`));
+        console.log(
+          chalk.white(`Next Payout At: ${txn.nextPayoutAt.toISOString()}`)
+        );
+        console.log(
+          chalk.white(`Investment Ends At: ${endDate.toISOString()}`)
+        );
+        console.log(
+          chalk.gray("-------------------------------------------------------")
+        );
+        console.log({
+          now,
+          createdAt: txn.createdAt,
+          nextPayoutAt: txn.nextPayoutAt,
+          totalPossibleCycles,
+          roiEarned: txn.roiEarned,
+          profitPerCycle,
+          expectedCyclesPaid: txn.roiEarned / profitPerCycle,
+        });
+
+        // --- Handle completion and capital return ---
+        if (now >= endDate || updatedRoiEarned >= expectedTotalROI) {
           txn.status = "completed";
           txn.isCompleted = true;
-
-          const alreadyReturned = await Transaction.exists({
-            user: user._id,
-            plan: plan._id,
-            type: "capitalReturn",
-          });
 
           const expectedTotalRoi =
             plan.roiUnit === "%"
               ? (txn.amount * plan.roiValue * plan.durationInDays) / 100
               : plan.roiValue * plan.durationInDays;
 
-          const roiCappedEarly = txn.roiEarned >= expectedTotalRoi * 0.99; // tolerance for rounding
+          const roiCappedEarly = txn.roiEarned >= expectedTotalRoi * 0.99;
+          const alreadyReturned = await Transaction.exists({
+            user: user._id,
+            plan: plan._id,
+            type: "capitalReturn",
+          });
 
-          if (!alreadyReturned && !roiCappedEarly) {
-            await User.updateOne(
-              { _id: user._id },
-              { $inc: { mainWallet: txn.amount } },
-              { session }
-            );
+          if (!alreadyReturned) {
+            if (plan.capitalBack) {
+              await User.updateOne(
+                { _id: user._id },
+                { $inc: { mainWallet: txn.amount } },
+                { session }
+              );
 
-            await Transaction.create(
-              [
-                {
-                  user: user._id,
-                  plan: plan._id,
-                  type: "capitalReturn",
-                  amount: txn.amount,
-                  status: "success",
-                  reference: `${Date.now()}`,
-                },
-              ],
-              { session }
-            );
+              await Transaction.create(
+                [
+                  {
+                    user: user._id,
+                    plan: plan._id,
+                    type: "capitalReturn",
+                    amount: txn.amount,
+                    status: "success",
+                    reference: `${Date.now()}`,
+                  },
+                ],
+                { session }
+              );
 
+              console.log(
+                chalk.greenBright(
+                  `💸 Capital Returned: $${txn.amount} | User: ${user.email}`
+                )
+              );
+
+              console.log(
+                chalk.gray(
+                  `📅 Returned At: ${new Date().toISOString()} | ROI capped early: ${roiCappedEarly}`
+                )
+              );
+
+              await sendNotification(
+                String(user._id),
+                "Capital Returned",
+                `Your investment of $${txn.amount} has matured, and your capital has been returned.`,
+                "investment"
+              );
+            } else {
+              console.log(
+                chalk.gray(
+                  `🚫 No capital return — plan.capitalBack = false for ${user.email}`
+                )
+              );
+            }
+          } else {
             console.log(
-              chalk.greenBright(`💸 Capital returned to ${user.email}`)
-            );
-
-            await sendNotification(
-              String(user._id),
-              "Capital Returned",
-              `Your investment of $${txn.amount} has matured, and capital has been returned.`,
-              "investment"
-            );
-          } else if (roiCappedEarly) {
-            console.log(
-              chalk.yellowBright(
-                `⚠️ Skipping capital return for ${user.email} — ROI already capped early.`
+              chalk.gray(
+                `🔁 Capital already returned previously for ${user.email}`
               )
             );
           }
@@ -256,9 +371,9 @@ async function processROICredit() {
 
         console.log(
           chalk.greenBright(
-            `✅ Credited $${totalProfit.toFixed(2)} ROI to ${
+            `✅ ROI Credited Successfully: $${totalProfit.toFixed(2)} | ${
               user.email
-            } (${missedCycles}x)`
+            }`
           )
         );
       } catch (err) {
@@ -274,11 +389,9 @@ async function processROICredit() {
       }
     }
 
-    console.log(chalk.cyanBright("🏁 ROI Job completed successfully.\n"));
+    console.log(chalk.cyanBright("\n🏁 ROI Job completed successfully.\n"));
   } catch (err) {
     console.error(chalk.redBright("❌ ROI Cron Error:"), err);
-
-    // Retry once if crash occurs
     if (!retrying) {
       retrying = true;
       setTimeout(async () => {
