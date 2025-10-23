@@ -62,8 +62,28 @@ async function processROICredit() {
 
       if (txn.status === "completed")
         reasons.push("🏁 Investment already completed.");
-      else if (txn.nextPayoutAt && txn.nextPayoutAt > endDate)
-        reasons.push("🏁 Fully matured (past all payout cycles).");
+      else {
+        const roiValue =
+          plan.roiUnit === "%"
+            ? (txn.amount * plan.roiValue) / 100
+            : plan.roiValue;
+        const totalPossibleCycles =
+          plan.returnPeriod === "hour"
+            ? plan.durationInDays * 24
+            : plan.returnPeriod === "daily"
+            ? plan.durationInDays
+            : plan.returnPeriod === "weekly"
+            ? Math.ceil(plan.durationInDays / 7)
+            : 1;
+
+        const expectedCyclesPaid = Math.floor(txn.roiEarned / roiValue);
+
+        if (expectedCyclesPaid >= totalPossibleCycles) {
+          reasons.push(
+            "🏁 Fully matured and fully credited (past all payout cycles)."
+          );
+        }
+      }
 
       if (!txn.nextPayoutAt) reasons.push("⚠️ nextPayoutAt missing.");
       else if (txn.nextPayoutAt.getTime() - now.getTime() > 5000)
@@ -158,6 +178,17 @@ async function processROICredit() {
         if (missedCycles < 0) missedCycles = 0;
         if (missedCycles > totalPossibleCycles - expectedCyclesPaid)
           missedCycles = totalPossibleCycles - expectedCyclesPaid;
+        const endDate = new Date(txn.createdAt);
+        const expectedTotalROI = profitPerCycle * totalPossibleCycles;
+        // ✅ If investment already past end date but ROI not fully credited, force final payout
+        if (now > endDate && txn.roiEarned < expectedTotalROI) {
+          console.log(
+            chalk.yellowBright(
+              `⚠️ Detected late cron: Finalizing last ROI + capital for ${txn.user?.email}`
+            )
+          );
+          missedCycles = Math.max(totalPossibleCycles - expectedCyclesPaid, 1); // force last ROI cycle
+        }
 
         if (missedCycles > 0) {
           console.log(
@@ -166,8 +197,6 @@ async function processROICredit() {
             )
           );
         }
-
-        const expectedTotalROI = profitPerCycle * totalPossibleCycles;
 
         // Calculate ROI that will be earned now
         const totalProfit = profitPerCycle * missedCycles;
@@ -242,7 +271,6 @@ async function processROICredit() {
         txn.lastRoiAt = now;
         txn.nextPayoutAt = new Date(now.getTime() + intervalMs);
 
-        const endDate = new Date(txn.createdAt);
         endDate.setDate(
           endDate.getDate() + (txn.durationInDays || plan.durationInDays || 0)
         );

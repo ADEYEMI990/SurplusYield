@@ -4,5 +4,5 @@ import { getAdminStats } from "../controllers/adminController";
 import { admin } from "../middleware/authMiddleware";
 
 const router = express.Router();
-router.get("/stats", admin, getAdminStats);
+router.get("/stats", getAdminStats);
 export default router;
