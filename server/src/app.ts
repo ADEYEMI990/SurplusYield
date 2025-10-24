@@ -3,7 +3,6 @@ import dotenv from "dotenv";
 import path from "path";
 // ✅ Explicitly point to your .env in project root
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
-
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -33,16 +32,7 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(
-  cors({
-    origin: [
-      "http://localhost:5173",
-      "https://surplusyield.vercel.app",
-      "https://surplusyield.onrender.com",
-    ],
-    credentials: true,
-  })
-);
+app.use(cors());
 app.use(helmet());
 app.use(morgan("dev"));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
