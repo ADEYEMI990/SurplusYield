@@ -40,6 +40,7 @@ export default function PlanForm({
   });
   const [icon, setIcon] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [preview, setPreview] = useState<string>(initialData?.icon || ""); // ✅ Add this line
 
   // prefill for edit
   useEffect(() => {
@@ -82,28 +83,31 @@ export default function PlanForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
     try {
-      const formData = new FormData();
-      Object.entries(form).forEach(([key, val]) => {
-        if (Array.isArray(val)) {
-          val.forEach((v) => formData.append(key, v));
-        } else {
-          formData.append(key, val as string);
-        }
-      });
-      if (icon) formData.append("icon", icon);
+      let iconUrl = form.icon || "";
+
+      // ✅ 1️⃣ Upload image first if new file selected
+      if (icon) {
+        const imgForm = new FormData();
+        imgForm.append("file", icon);
+        const uploadRes = await API.post("/upload", imgForm, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        iconUrl = uploadRes.data.imageUrl;
+      }
+
+      // ✅ 2️⃣ Then create or update plan
+      const payload = { ...form, icon: iconUrl };
 
       if (mode === "create") {
-        await API.post("/plans", formData);
+        await API.post("/plans", payload);
         toast.success("Plan created successfully");
-      } else {
-        if (initialData?._id) {
-          await API.put(`/plans/${initialData._id}`, formData);
-          toast.success("Plan updated successfully");
-        } else {
-          toast.error("No plan ID found to update");
-        }
+      } else if (initialData?._id) {
+        await API.put(`/plans/${initialData._id}`, payload);
+        toast.success("Plan updated successfully");
       }
+
       onSuccess();
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -131,8 +135,25 @@ export default function PlanForm({
             className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             type="file"
             accept="image/*"
-            onChange={(e) => setIcon(e.target.files?.[0] || null)}
+            onChange={(e) => {
+              const file = e.target.files?.[0] || null;
+              setIcon(file);
+              if (file) {
+                const localUrl = URL.createObjectURL(file); // ✅ Show local preview instantly
+                setPreview(localUrl);
+              }
+            }}
           />
+
+          {preview && (
+            <div className="mt-2">
+              <img
+                src={preview}
+                alt="Preview"
+                className="w-20 h-20 rounded-lg border object-cover"
+              />
+            </div>
+          )}
         </div>
 
         {/* Plan Name & Badge */}

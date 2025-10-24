@@ -1,5 +1,9 @@
 import express from "express";
 import dotenv from "dotenv";
+import path from "path";
+// ✅ Explicitly point to your .env in project root
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
+
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -14,7 +18,6 @@ import adminSettingRoutes from "./routes/adminSettingRoutes";
 import userRoutes from "./routes/userRoutes";
 import "./jobs/roiJob";
 import { notFound, errorHandler } from "./middleware/errorMiddleware";
-import path from "path";
 import kycRoutes from "./routes/KycRoutes";
 import uploadRoutes from "./routes/uploadRoutes";
 import walletRoutes from "./routes/walletRoutes";
@@ -30,7 +33,16 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors());
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://surplusyield.vercel.app",
+      "https://surplusyield.onrender.com",
+    ],
+    credentials: true,
+  })
+);
 app.use(helmet());
 app.use(morgan("dev"));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));

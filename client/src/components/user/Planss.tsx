@@ -8,7 +8,6 @@ import Loader from "../common/Loader";
 import { Check } from "lucide-react";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
-import { getImageUrl } from "../../utils/getImageUrl";
 
 interface Plan {
   _id: string;
@@ -119,7 +118,7 @@ export default function PlansLanding() {
               <div className="flex flex-col items-center text-center gap-3 sm:gap-4 mt-4">
                 {plan.icon && (
                   <img
-                    src={getImageUrl(plan.icon)}
+                    src={plan.icon}
                     alt={plan.name}
                     className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border border-blue-100 shadow-sm"
                   />

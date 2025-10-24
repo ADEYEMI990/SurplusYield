@@ -11,7 +11,6 @@ import { toast } from "react-toastify";
 import type { Transaction } from "../../types/transaction";
 import type { ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { getImageUrl } from "../../utils/getImageUrl";
 
 interface Plan {
   _id: string;
@@ -239,7 +238,7 @@ export default function UserPlans() {
             <div className="flex flex-col items-center text-center gap-3">
               {plan.icon && (
                 <img
-                  src={getImageUrl(plan.icon)}
+                  src={plan.icon}
                   alt={plan.name}
                   className="w-14 h-14 rounded-full border border-gray-300"
                 />
@@ -530,7 +529,7 @@ export default function UserPlans() {
                       <td className="px-4 py-3 hidden md:table-cell">
                         {plan.icon ? (
                           <img
-                            src={getImageUrl(plan.icon)}
+                            src={plan.icon}
                             alt={plan.name}
                             className="w-8 h-8 rounded-full border"
                           />
