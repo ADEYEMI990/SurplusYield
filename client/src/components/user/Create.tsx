@@ -153,7 +153,7 @@ export default function UserCreate() {
                           </div>
                         </div>
                       </div>
-                      <div className="text-sm text-white bg-yellow-600 rounded-full px-3 py-1">
+                      <div className="text-sm text-white bg-green-600 rounded-full px-3 py-1">
                           {it.status}
                         </div>
                       <div className="text-right">
