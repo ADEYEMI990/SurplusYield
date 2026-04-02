@@ -1,12 +1,11 @@
-import express from "express";
 import dotenv from "dotenv";
 import path from "path";
 // ✅ Explicitly point to your .env in project root
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 import cors from "cors";
+import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
-import connectDB from "./config/db";
 import authRoutes from "./routes/auth.routes";
 import planRoutes from "./routes/planRoutes";
 import transactionRoutes from "./routes/transactionRoutes";
@@ -25,17 +24,26 @@ import notificationRoutes from "./routes/notificationRoutes";
 import spotlightRoutes from "./routes/spotlightRoutes"; 
 
 dotenv.config();
-connectDB();
+
 
 const app = express();
+
+// Root route
+app.get("/", (req, res) => {
+	res.send({ message: "API is running" });
+});
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
 app.use(morgan("dev"));
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+// app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Routes
 app.use("/api/auth", authRoutes);

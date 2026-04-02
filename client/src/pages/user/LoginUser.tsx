@@ -5,7 +5,7 @@ import API from "../../lib/api";
 import useAuthStore from "../../stores/authStore";
 import axios from "axios";
 import { toast } from "react-toastify";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, ArrowRight, Shield } from "lucide-react";
 import { assets } from "../../assets/assets";
 
 import Card, {
@@ -13,8 +13,6 @@ import Card, {
   CardTitle,
   CardContent,
 } from "../../components/common/Card";
-import Input from "../../components/common/Input";
-import Button from "../../components/common/Button";
 
 export default function LoginUser() {
   const [email, setEmail] = useState("");
@@ -30,7 +28,6 @@ export default function LoginUser() {
     try {
       const { data } = await API.post("/auth/login", { email, password });
       setAuth({ user: data.user, token: data.token, role: "user" });
-      console.log("LOGIN RESPONSE DATA:", data);
       toast.success("Login successful ✅");
       navigate("/user/dashboard");
     } catch (err: unknown) {
@@ -47,88 +44,121 @@ export default function LoginUser() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-8">
-      <Card className="w-full max-w-sm sm:max-w-md md:max-w-lg shadow-md rounded-xl">
-        <CardHeader className="text-center pb-2">
-          <CardTitle className="text-2xl flex justify-center items-center gap-3 font-semibold text-gray-800">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white px-4 sm:px-6 py-8">
+      <div className="w-full max-w-md">
+        {/* Logo Section */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-2xl mb-4">
             <img
-              src={assets.SY}
+              src={assets.cashapp_logo}
               alt="Logo"
-              className="w-7 h-7 rounded bg-gray-800 translate-y-[1px]"
+              className="w-10 h-10 rounded-full"
             />
-            <span className="tracking-wide"> User Login </span>
-          </CardTitle>
-          <p className="mt-1 text-sm text-gray-500">
-            Welcome back! Please sign in to continue.
-          </p>
-        </CardHeader>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900">Welcome Back</h1>
+          <p className="text-gray-500 mt-1">Sign in to your account</p>
+        </div>
 
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            {/* Email */}
-            <Input
-              type="email"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              label="Email"
-            />
+        <Card className="w-full shadow-lg rounded-2xl border border-gray-100">
+          <CardHeader className="text-center pt-6">
+            <CardTitle className="text-xl font-bold text-gray-900">
+              User Login
+            </CardTitle>
+          </CardHeader>
 
-            {/* Password with toggle */}
-            <div className="relative">
-              <Input
-                type={showPassword ? "text" : "password"}
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                label="Password"
-              />
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-5">
+              {/* Email */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-colors text-gray-900"
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-colors text-gray-900"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Forgot Password Link */}
+              <div className="text-right">
+                <a href="#" className="text-sm text-green-600 hover:text-green-700">
+                  Forgot password?
+                </a>
+              </div>
+
+              {/* Submit Button */}
               <button
-                type="button"
-                onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute right-3 top-8 sm:top-9 text-gray-500 hover:text-gray-700"
+                type="submit"
+                disabled={loading}
+                className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-4"
               >
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                {loading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  <>
+                    Sign In <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
+            </form>
+
+            {/* Security Note */}
+            <div className="mt-6 p-3 bg-green-50 rounded-xl border border-green-100">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-green-600" />
+                <p className="text-xs text-green-700">
+                  Your account is protected with bank-grade security
+                </p>
+              </div>
             </div>
 
-            {/* Submit button */}
-            <Button
-              type="submit"
-              variant="primary"
-              size="md"
-              className="w-full"
-              loading={loading}
-            >
-              {loading ? "Logging in..." : "Login"}
-            </Button>
-          </form>
-
-          {/* Links */}
-          <div className="text-center mt-6 text-sm space-y-2">
-            <p>
-              Not a Member?{" "}
-              <Link
-                to="/auth/register"
-                className="font-medium text-blue-600 hover:underline"
-              >
-                SIGN UP
-              </Link>
-            </p>
-            <Link to="/auth/register">
-              <Button
-                variant="secondary"
-                size="sm"
-                className="w-full sm:w-auto px-6"
-              >
-                Go to Signup
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+            {/* Signup Link */}
+            <div className="text-center mt-6 pt-4 border-t border-gray-100">
+              <p className="text-sm text-gray-600">
+                Don't have an account?{" "}
+                <Link to="/auth/register" className="text-green-600 font-semibold hover:text-green-700">
+                  Create Account
+                </Link>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 // Utility to send notifications to users
-import { Notification } from "../models/Notification";
+import prisma from "../lib/prisma";
 
 export const sendNotification = async (
   userId: string,
@@ -8,11 +8,13 @@ export const sendNotification = async (
   type: "investment" | "transaction" | "kyc" | "security" | "system" = "system"
 ) => {
   try {
-    await Notification.create({
-      user: userId,
-      title,
-      message,
-      type,
+    await prisma.notification.create({
+      data: {
+        userId,
+        title,
+        message,
+        type,
+      },
     });
   } catch (err) {
     console.error("❌ Failed to create notification:", err);

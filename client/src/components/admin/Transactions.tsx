@@ -10,18 +10,18 @@ import { toast } from "react-toastify";
 
 interface User {
   name: string;
-  _id: string;
+  id: string;
   username: string;
   email: string;
 }
 
 interface Plan {
-  _id: string;
+  id: string;
   name: string;
 }
 
 export interface Transaction {
-  _id: string;
+  id: string;
   user: User;
   plan?: Plan;
   type: string;
@@ -114,14 +114,14 @@ export default function AdminTransactions() {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => updateStatus(row._id, "success")}
+                onClick={() => updateStatus(row.id, "success")}
               >
                 success
               </Button>
               <Button
                 variant="danger"
                 size="sm"
-                onClick={() => updateStatus(row._id, "failed")}
+                onClick={() => updateStatus(row.id, "failed")}
               >
                 Fail
               </Button>
@@ -179,7 +179,7 @@ export default function AdminTransactions() {
           <div className="sm:hidden space-y-4">
             {paginatedData.map((t) => (
               <div
-                key={t._id}
+                key={t.id}
                 className="p-4 border rounded-lg bg-white shadow-sm space-y-2"
               >
                 <p className="text-sm">
@@ -211,14 +211,14 @@ export default function AdminTransactions() {
                     <Button
                       variant="primary"
                       size="sm"
-                      onClick={() => updateStatus(t._id, "success")}
+                      onClick={() => updateStatus(t.id, "success")}
                     >
                       Success
                     </Button>
                     <Button
                       variant="danger"
                       size="sm"
-                      onClick={() => updateStatus(t._id, "failed")}
+                      onClick={() => updateStatus(t.id, "failed")}
                     >
                       Failed
                     </Button>

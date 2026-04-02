@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
-import Spotlight from "../models/Spotlight";
-import mongoose from "mongoose";
+import prisma from "../lib/prisma";
 
 // Create spotlight (admin)
 export const createSpotlight = asyncHandler(async (req: Request, res: Response) => {
@@ -11,58 +10,76 @@ export const createSpotlight = asyncHandler(async (req: Request, res: Response) 
     throw new Error("type and title are required");
   }
 
-  const spotlight = await Spotlight.create({
-    type,
-    title,
-    subtitle,
-    date: date ? new Date(date) : undefined,
-    status,
-    net,
-    total,
-    amount,
-    meta,
-    order,
-    createdBy: (req as any).user?._id,
+  const spotlight = await prisma.spotlight.create({
+    data: {
+      type,
+      title,
+      subtitle,
+      date: date ? new Date(date) : undefined,
+      status,
+      net,
+      total,
+      amount,
+      meta,
+      order,
+      createdBy: (req as any).user?.id,
+    },
   });
-
   res.status(201).json({ success: true, spotlight });
 });
 
 // Update spotlight (admin)
 export const updateSpotlight = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  let id = req.params.id;
+  id = Array.isArray(id) ? id[0] : id;
   const update = req.body;
-  const spotlight = await Spotlight.findByIdAndUpdate(id, update, { new: true });
-  if (!spotlight) {
+  try {
+    const spotlight = await prisma.spotlight.update({
+      where: { id },
+      data: update,
+    });
+    res.json({ success: true, spotlight });
+  } catch (e) {
     res.status(404);
     throw new Error("Spotlight not found");
   }
-  res.json({ success: true, spotlight });
 });
 
 // Delete spotlight (admin)
 export const deleteSpotlight = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const spotlight = await Spotlight.findByIdAndDelete(id);
-  if (!spotlight) {
+  let id = req.params.id;
+  id = Array.isArray(id) ? id[0] : id;
+  try {
+    await prisma.spotlight.delete({ where: { id } });
+    res.json({ success: true, message: "Deleted" });
+  } catch (e) {
     res.status(404);
     throw new Error("Spotlight not found");
   }
-  res.json({ success: true, message: "Deleted" });
 });
 
 // List all spotlights (public)
 export const listSpotlights = asyncHandler(async (req: Request, res: Response) => {
-  // optional query param: type=investment|withdraw
   const type = req.query.type as string | undefined;
-  const q: any = {};
-  if (type) q.type = type;
-  const items = await Spotlight.find(q).sort({ order: 1, createdAt: -1 }).limit(50);
+  const where = type ? { type } : {};
+  const items = await prisma.spotlight.findMany({
+    where,
+    orderBy: [
+      { order: "asc" },
+      { createdAt: "desc" },
+    ],
+    take: 50,
+  });
   res.json(items);
 });
 
 // admin list (all)
 export const adminListSpotlights = asyncHandler(async (req: Request, res: Response) => {
-  const items = await Spotlight.find().sort({ order: 1, createdAt: -1 });
+  const items = await prisma.spotlight.findMany({
+    orderBy: [
+      { order: "asc" },
+      { createdAt: "desc" },
+    ],
+  });
   res.json(items);
 });

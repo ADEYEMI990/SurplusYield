@@ -1,51 +1,38 @@
 // server/src/utils/walletUtils.ts
-import mongoose from "mongoose";
-import User from "../models/User";
-import { ITransaction } from "../models/Transaction";
+
+import prisma from "../lib/prisma";
+
 
 /**
- * Apply a transaction to the user's wallets (atomic when called with a session).
- * Uses $inc to update numeric fields.
- *
+ * Apply a transaction to the user's wallets using Prisma.
  * @param transaction - the transaction that was completed
- * @param session - optional mongoose session to include in a transaction
+ *   Should have: { user: userId, type, amount }
  */
 export async function applyTransactionToWalletAtomic(
-  transaction: ITransaction,
-  session?: mongoose.ClientSession
+  transaction: { user: string; type: string; amount: number }
 ): Promise<void> {
   if (!transaction.user) return;
 
-  const inc: Record<string, number> = {};
-
+  let data: Record<string, any> = {};
   switch (transaction.type) {
     case "deposit":
-      // deposit increases mainWallet
-      inc["mainWallet"] = transaction.amount;
+      data = { mainWallet: { increment: transaction.amount } };
       break;
     case "withdrawal":
-      // withdrawal decreases mainWallet
-      inc["mainWallet"] = -transaction.amount;
+      data = { mainWallet: { decrement: transaction.amount } };
       break;
     case "profit":
     case "roi":
-      // profit/roi increases profitWallet
-      inc["profitWallet"] = transaction.amount;
-      inc["mainWallet"] = transaction.amount; // also track totalProfit
+      data = { profitWallet: { increment: transaction.amount } };
       break;
     case "bonus":
-      // these increase profitWallet
-      inc["profitWallet"] = transaction.amount;
+      data = { profitWallet: { increment: transaction.amount } };
       break;
     default:
-      // unknown types: do nothing
       return;
   }
-
-  // Use updateOne with $inc for atomic update. Include session if provided.
-  await User.updateOne(
-    { _id: transaction.user },
-    { $inc: inc },
-    { session }
-  );
+  await prisma.user.update({
+    where: { id: transaction.user },
+    data,
+  });
 }

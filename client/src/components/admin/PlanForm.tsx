@@ -81,47 +81,48 @@ export default function PlanForm({
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  e.preventDefault();
+  setLoading(true);
 
-    try {
-      let iconUrl = form.icon || "";
+  try {
+    const formData = new FormData();
 
-      // ✅ 1️⃣ Upload image first if new file selected
-      if (icon) {
-        const imgForm = new FormData();
-        imgForm.append("file", icon);
-        const uploadRes = await API.post("/upload", imgForm, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-        iconUrl = uploadRes.data.imageUrl;
+    // append all fields
+    Object.entries(form).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        if (Array.isArray(value)) {
+          value.forEach((v) => formData.append(key, v));
+        } else {
+          formData.append(key, String(value));
+        }
       }
+    });
 
-      // ✅ 2️⃣ Then create or update plan
-      const payload = { ...form, icon: iconUrl };
-
-      if (mode === "create") {
-        await API.post("/plans", payload);
-        toast.success("Plan created successfully");
-      } else if (initialData?._id) {
-        await API.put(`/plans/${initialData._id}`, payload);
-        toast.success("Plan updated successfully");
-      }
-
-      onSuccess();
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        toast.error(err.message);
-      } else if (typeof err === "object" && err && "response" in err) {
-        const axiosErr = err as { response?: { data?: { message?: string } } };
-        toast.error(axiosErr.response?.data?.message || "Error saving plan");
-      } else {
-        toast.error("Unknown error occurred");
-      }
-    } finally {
-      setLoading(false);
+    // append file
+    if (icon) {
+      formData.append("icon", icon); // MUST MATCH multer.single("icon")
     }
-  };
+
+    if (mode === "create") {
+      await API.post("/plans", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      toast.success("Plan created successfully");
+    } else if (initialData?.id) {
+      await API.put(`/plans/${initialData.id}`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      toast.success("Plan updated successfully");
+    }
+
+    onSuccess();
+  } catch (err: any) {
+    console.log(err.response?.data);
+    toast.error(err.response?.data?.message || "Error saving plan");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <Card className="border-2 border-gray-200 rounded-2xl p-6 bg-white mt-4">

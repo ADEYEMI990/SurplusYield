@@ -1,33 +1,48 @@
-import { Request, Response } from "express";
-import { Notification } from "../models/Notification";
+import { Response } from "express";
+import asyncHandler from "express-async-handler";
+import prisma from "../lib/prisma";
 
-export const getUserNotifications = async (req: Request, res: Response) => {
+export const getNotifications = asyncHandler(async (req: any, res: Response): Promise<void> => {
   try {
-    const userId = req.user?._id;
-    const notifications = await Notification.find({ user: userId })
-      .sort({ createdAt: -1 })
-      .limit(20);
+    const userId = req.user?.id;
+    const notifications = await prisma.notification.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    });
     res.json(notifications);
+    return;
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch notifications" });
+    return;
   }
-};
+});
 
-export const markAsRead = async (req: Request, res: Response) => {
+export const markNotificationRead = asyncHandler(async (req: any, res: Response): Promise<void> => {
   try {
-    await Notification.findByIdAndUpdate(req.params.id, { read: true });
+    await prisma.notification.update({
+      where: { id: req.params.id },
+      data: { read: true },
+    });
     res.json({ success: true });
+    return;
   } catch (err) {
     res.status(500).json({ message: "Failed to mark as read" });
+    return;
   }
-};
+});
 
-export const markAllAsRead = async (req: Request, res: Response) => {
+export const markAllNotificationsRead = asyncHandler(async (req: any, res: Response): Promise<void> => {
   try {
-    const userId = req.user?._id;
-    await Notification.updateMany({ user: userId, read: false }, { read: true });
+    const userId = req.user?.id;
+    await prisma.notification.updateMany({
+      where: { userId, read: false },
+      data: { read: true },
+    });
     res.json({ success: true });
+    return;
   } catch {
     res.status(500).json({ message: "Failed to mark all as read" });
+    return;
   }
-};
+});

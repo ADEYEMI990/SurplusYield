@@ -1,84 +1,62 @@
 // server/src/controllers/adminController.ts
 import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
-import User from "../models/User";
-import { Transaction } from "../models/Transaction";
+import prisma from "../lib/prisma";
 
 export const getAdminStats = asyncHandler(async (req: Request, res: Response) => {
-  const [totalUsers, totalTransactions, deposits, withdrawals, investments] =
-    await Promise.all([
-      User.countDocuments({ role: "user" }),
-      Transaction.countDocuments(),
-      Transaction.aggregate([
-        { $match: { type: "deposit", status: "success" } },
-        { $group: { _id: null, total: { $sum: "$amount" } } },
-      ]),
-      Transaction.aggregate([
-        { $match: { type: "withdrawal", status: "success" } },
-        { $group: { _id: null, total: { $sum: "$amount" } } },
-      ]),
-      Transaction.aggregate([
-        { $match: { type: "investment", status: "success" } },
-        { $group: { _id: null, total: { $sum: "$amount" } } },
-      ]),
-    ]);
-
-  const chartData = await Transaction.aggregate([
-    {
-      $match: { status: "success" },
-    },
-    {
-      $group: {
-        _id: {
-          date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-          type: "$type",
-        },
-        total: { $sum: "$amount" },
-      },
-    },
-    {
-      $group: {
-        _id: "$_id.date",
-        deposits: {
-          $sum: {
-            $cond: [{ $eq: ["$_id.type", "deposit"] }, "$total", 0],
-          },
-        },
-        withdrawals: {
-          $sum: {
-            $cond: [{ $eq: ["$_id.type", "withdrawal"] }, "$total", 0],
-          },
-        },
-        investments: {
-          $sum: {
-            $cond: [{ $eq: ["$_id.type", "investment"] }, "$total", 0],
-          },
-        },
-      },
-    },
-    { $sort: { _id: 1 } },
+  // Basic counts
+  const [totalUsers, totalTransactions] = await Promise.all([
+    prisma.user.count({ where: { role: "user" } }),
+    prisma.transaction.count(),
   ]);
 
-  // ✅ Construct final JSON response
+  // Sums for deposits, withdrawals, investments
+  const [deposits, withdrawals, investments] = await Promise.all([
+    prisma.transaction.aggregate({
+      _sum: { amount: true },
+      where: { type: "deposit", status: "success" },
+    }),
+    prisma.transaction.aggregate({
+      _sum: { amount: true },
+      where: { type: "withdrawal", status: "success" },
+    }),
+    prisma.transaction.aggregate({
+      _sum: { amount: true },
+      where: { type: "investment", status: "success" },
+    }),
+  ]);
+
+  // Chart data: group by date and type
+  const txns = await prisma.transaction.findMany({
+    where: { status: "success" },
+    select: { createdAt: true, type: true, amount: true },
+    orderBy: { createdAt: "asc" },
+  });
+  // Group by date and type in JS
+  const chartMap: Record<string, { deposits: number; withdrawals: number; investments: number }> = {};
+  txns.forEach((txn) => {
+    const date = txn.createdAt.toISOString().slice(0, 10);
+    if (!chartMap[date]) {
+      chartMap[date] = { deposits: 0, withdrawals: 0, investments: 0 };
+    }
+    if (txn.type === "deposit") chartMap[date].deposits += Number(txn.amount);
+    if (txn.type === "withdrawal") chartMap[date].withdrawals += Number(txn.amount);
+    if (txn.type === "investment") chartMap[date].investments += Number(txn.amount);
+  });
+  const chartData = Object.entries(chartMap).map(([date, vals]) => ({ date, ...vals }));
+
   const responseData = {
     totalUsers,
-    totalDeposits: deposits[0]?.total || 0,
-    totalWithdrawals: withdrawals[0]?.total || 0,
-    totalInvestments: investments[0]?.total || 0,
+    totalDeposits: deposits._sum.amount || 0,
+    totalWithdrawals: withdrawals._sum.amount || 0,
+    totalInvestments: investments._sum.amount || 0,
     totalTransactions,
-    chartData: chartData.map((c) => ({
-      date: c._id,
-      deposits: c.deposits,
-      withdrawals: c.withdrawals,
-      investments: c.investments,
-    })),
+    chartData,
   };
 
-  // ✅ Log all response data in a formatted way
-  console.log("\n📊 ===== ADMIN DASHBOARD STATS =====");
+  console.log("===== ADMIN DASHBOARD STATS =====");
   console.log(JSON.stringify(responseData, null, 2));
-  console.log("===================================\n");
+  console.log("===================================");
 
-  // Send the data to frontend
   res.json(responseData);
 });

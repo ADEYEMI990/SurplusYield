@@ -8,7 +8,7 @@ import API from "../../lib/api";
 import type { AxiosError } from "axios";
 
 interface Plan {
-  _id: string;
+  id: string;
   name: string;
   status: string;
   planType: "fixed" | "range";
@@ -143,9 +143,9 @@ export default function InvestmentCalculator() {
               <select
                 title="Select Plan"
                 className="w-full border rounded-md px-3 py-2 mt-1"
-                value={selectedPlan?._id || ""}
+                value={selectedPlan?.id || ""}
                 onChange={(e) => {
-                  const plan = plans.find((p) => p._id === e.target.value);
+                  const plan = plans.find((p) => p.id === e.target.value);
                   setSelectedPlan(plan || null);
                   setAmount(plan?.amount || 0);
                   setProjected(0);
@@ -153,7 +153,7 @@ export default function InvestmentCalculator() {
               >
                 <option value="">-- Choose a plan --</option>
                 {plans.map((plan) => (
-                  <option key={plan._id} value={plan._id}>
+                  <option key={plan.id} value={plan.id}>
                     {plan.name}
                   </option>
                 ))}

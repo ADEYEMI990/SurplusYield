@@ -1,4 +1,4 @@
-// src/components/landing/PlansLanding.tsx
+// src/components/user/PlansLanding.tsx
 "use client";
 import { useEffect, useState } from "react";
 import API from "../../lib/api";
@@ -10,7 +10,7 @@ import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 
 interface Plan {
-  _id: string;
+  id: string;
   icon?: string;
   name: string;
   badge: string;
@@ -75,7 +75,7 @@ export default function PlansLanding() {
   return (
     <section
       id="plans"
-      className="relative scroll-snap-start py-16 sm:py-20 bg-gradient-to-b from-white to-blue-50 overflow-hidden"
+      className="relative scroll-snap-start py-16 sm:py-20 bg-gradient-to-b from-white to-green-50 overflow-hidden"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-10 text-center">
         {/* Heading */}
@@ -83,7 +83,7 @@ export default function PlansLanding() {
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight">
             Our Investment Plans
           </h2>
-          <p className="text-blue-600 text-lg sm:text-xl font-medium">
+          <p className="text-green-600 text-lg sm:text-xl font-medium">
             The plans we offer are specifically made for you
           </p>
         </div>
@@ -98,7 +98,7 @@ export default function PlansLanding() {
         >
           {plans.map((plan) => (
             <Card
-              key={plan._id}
+              key={plan.id}
               className={`
                 relative flex flex-col justify-between 
                 border border-gray-100 
@@ -110,7 +110,7 @@ export default function PlansLanding() {
               `}
             >
               {/* Badge */}
-              <div className="absolute top-4 right-4 bg-blue-600 text-white px-3 py-1 text-xs sm:text-sm rounded-full uppercase tracking-wide shadow-sm">
+              <div className="absolute top-4 right-4 bg-green-600 text-white px-3 py-1 text-xs sm:text-sm rounded-full uppercase tracking-wide shadow-sm">
                 {plan.badge}
               </div>
 
@@ -120,21 +120,21 @@ export default function PlansLanding() {
                   <img
                     src={plan.icon}
                     alt={plan.name}
-                    className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border border-blue-100 shadow-sm"
+                    className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border border-green-100 shadow-sm"
                   />
                 )}
 
                 <h3 className="text-xl sm:text-2xl font-semibold text-gray-900">
                   {plan.name}
                 </h3>
-                <p className="text-blue-600 font-medium text-sm sm:text-base">
+                <p className="text-green-600 font-medium text-sm sm:text-base">
                   {plan.roiValue}
                   {plan.roiUnit} every {plan.returnPeriod}
                 </p>
               </div>
 
               {/* Plan details */}
-              <div className="mt-5 space-y-2 text-sm text-gray-700 bg-blue-50/30 rounded-xl p-4 border border-blue-100">
+              <div className="mt-5 space-y-2 text-sm text-gray-700 bg-green-50/30 rounded-xl p-4 border border-green-100">
                 <div className="flex justify-between">
                   <span>Investment:</span>
                   <span>
@@ -171,7 +171,7 @@ export default function PlansLanding() {
                 <Button
                   variant="primary"
                   size="md"
-                  className="rounded-full w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 transition-colors text-white px-6 py-3 font-medium shadow-md"
+                  className="rounded-full w-full sm:w-auto flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 transition-colors text-white px-6 py-3 font-medium shadow-md"
                   onClick={() => navigate(`/auth/register`)}
                 >
                   <Check size={16} /> Invest Now

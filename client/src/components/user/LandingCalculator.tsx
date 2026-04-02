@@ -1,4 +1,4 @@
-// src/components/landing/LandingCalculator.tsx
+// src/components/user/LandingCalculator.tsx
 import { useEffect, useState } from "react";
 import { Calculator } from "lucide-react";
 import { toast } from "react-toastify";
@@ -6,7 +6,7 @@ import API from "../../lib/api";
 import type { AxiosError } from "axios";
 
 interface Plan {
-  _id: string;
+  id: string;
   name: string;
   status: string;
   planType: "fixed" | "range";
@@ -115,10 +115,10 @@ export default function LandingCalculator() {
         amount <= (selectedPlan.maxAmount ?? Infinity));
 
   return (
-    <section className="w-full bg-gradient-to-b from-white to-blue-50 py-16" id="calculator">
+    <section className="w-full bg-gradient-to-b from-white to-green-50 py-16" id="calculator">
       <div className="max-w-4xl mx-auto px-6 text-center">
         <div className="mb-8">
-          <div className="inline-flex items-center justify-center bg-blue-100 text-blue-600 rounded-full p-3 mb-4">
+          <div className="inline-flex items-center justify-center bg-green-100 text-green-600 rounded-full p-3 mb-4">
             <Calculator className="w-6 h-6" />
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-gray-800">
@@ -129,7 +129,7 @@ export default function LandingCalculator() {
           </p>
         </div>
 
-        <div className="bg-white shadow-lg rounded-2xl p-8 space-y-6 max-w-2xl mx-auto border border-blue-100">
+        <div className="bg-white shadow-lg rounded-2xl p-8 space-y-6 max-w-2xl mx-auto border border-green-100">
           {loadingPlans ? (
             <p className="text-gray-500 text-center">Loading plans...</p>
           ) : (
@@ -140,11 +140,11 @@ export default function LandingCalculator() {
                   Select Plan
                 </label>
                 <select
-                title="Select Plan"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                  value={selectedPlan?._id || ""}
+                  title="Select Plan"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-400 focus:outline-none"
+                  value={selectedPlan?.id || ""}
                   onChange={(e) => {
-                    const plan = plans.find((p) => p._id === e.target.value);
+                    const plan = plans.find((p) => p.id === e.target.value);
                     setSelectedPlan(plan || null);
                     setAmount(plan?.amount || 0);
                     setProjected(0);
@@ -152,7 +152,7 @@ export default function LandingCalculator() {
                 >
                   <option value="">-- Choose a plan --</option>
                   {plans.map((plan) => (
-                    <option key={plan._id} value={plan._id}>
+                    <option key={plan.id} value={plan.id}>
                       {plan.name}
                     </option>
                   ))}
@@ -161,7 +161,7 @@ export default function LandingCalculator() {
 
               {/* Plan info */}
               {selectedPlan && (
-                <div className="bg-blue-50 rounded-lg p-4 text-left text-sm text-gray-700 border border-blue-100">
+                <div className="bg-green-50 rounded-lg p-4 text-left text-sm text-gray-700 border border-green-100">
                   <p>
                     <strong>Investment:</strong>{" "}
                     {selectedPlan.planType === "fixed"
@@ -185,7 +185,7 @@ export default function LandingCalculator() {
                     Enter Amount
                   </label>
                   <input
-                  title="Amount"
+                    title="Amount"
                     type="number"
                     value={amount}
                     onChange={handleAmountChange}
@@ -213,11 +213,11 @@ export default function LandingCalculator() {
                     Days to Calculate
                   </label>
                   <input
-                  title="Days"
+                    title="Days"
                     type="number"
                     value={days}
                     onChange={(e) => setDays(Number(e.target.value))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-400 focus:outline-none"
                   />
                 </div>
               )}

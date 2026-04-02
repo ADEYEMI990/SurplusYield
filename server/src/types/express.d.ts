@@ -1,10 +1,10 @@
-import { IUser } from "../models/User";
-import { Document } from "mongoose";
+
 
 declare global {
   namespace Express {
-    interface UserPayload extends Document {
-      _id: string;
+
+    interface UserPayload {
+      id: string;
       email: string;
       role: string;
     }

@@ -1,380 +1,550 @@
-// server/src/controllers/transactionController.ts
 import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
-import { Transaction } from "../models/Transaction";
+import prisma from "../lib/prisma";
 import { applyTransactionToWalletAtomic } from "../utils/walletUtils";
-import mongoose from "mongoose";
-import User from "../models/User";
-import { Plan } from "../models/Plan";
 import { sendNotification } from "../utils/notify";
+import { getReference } from "../utils/getReference";
 import path from "path";
 import fs from "fs";
+import { Prisma } from "@prisma/client";
 
-// Create transaction (User)
-// ✅ Create Transaction (Deposit, Withdrawal, Bonus, Investment)
+// ...existing code...
+// Create a transaction (user)
 export const createTransaction = asyncHandler(
-  async (req: Request, res: Response) => {
+  async (req: any, res: Response): Promise<void> => {
     if (!req.user) {
       res.status(401);
       throw new Error("Not authorized");
     }
 
-    const {
-      type,
-      amount,
-      planId,
-      plan,
-      bonusType,
-      status,
-      reference,
-      walletType,
-    } = req.body;
+    const { type, amount, currency = "USD", planId } = req.body;
+    const userId = req.user.id;
 
-    if (!type || !amount) {
+    if (!type || !amount || Number(amount) <= 0) {
       res.status(400);
-      throw new Error("Please provide type and amount");
+      throw new Error("Invalid transaction data");
     }
 
-    // Handle optional receipt upload
-    let receiptPath = "";
-    if (req.file) {
-      const uploadDir = path.join(__dirname, "../../uploads/receipts");
-      if (!fs.existsSync(uploadDir))
-        fs.mkdirSync(uploadDir, { recursive: true });
-      const fileName = `${Date.now()}_${req.file.originalname}`;
-      const filePath = path.join(uploadDir, fileName);
-      fs.writeFileSync(filePath, req.file.buffer);
-      receiptPath = `/uploads/receipts/${fileName}`;
-    }
+    // ==============================
+    // ✅ INVESTMENT (Atomic + Ledger-Based)
+    // ==============================
+    if (type === "investment") {
+      if (!planId) {
+        res.status(400);
+        throw new Error("Plan ID is required for investment");
+      }
 
-    // ✅ Non-investment transactions
-    if (type !== "investment") {
-      const transaction = await Transaction.create({
-        user: req.user._id,
-        type,
-        amount,
-        plan,
-        bonusType: type === "bonus" ? bonusType : undefined,
-        status: status || "pending",
-        receipt: receiptPath,
-        reference,
-      });
+      const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const baseFilter = {
+          userId,
+          status: "success",
+        };
 
-      // ✅ Update wallet only for successful transactions
-      if (status === "success") {
-        const user = await User.findById(req.user._id);
-        if (user) {
-          if (type === "deposit" || type === "bonus") {
-            user.mainWallet += Number(amount);
-            await sendNotification(
-              String(user._id),
-              "Deposit Successful",
-              `Your deposit of $${amount} was successful.`,
-              "transaction"
-            );
-          } else if (type === "withdrawal") {
-            if (user.mainWallet < Number(amount)) {
-              res.status(400);
-              throw new Error("Insufficient balance for withdrawal");
-            }
-            user.mainWallet -= Number(amount);
-            await sendNotification(
-              String(user._id),
-              "Withdrawal Processed",
-              `Your withdrawal of $${amount} has been processed.`,
-              "transaction"
-            );
-          }
-          await user.save();
+        // 1️⃣ Calculate REAL-TIME wallet inside transaction
+        const [
+          deposits,
+          investments,
+          withdrawals,
+          capitalReturns,
+        ] = await Promise.all([
+          tx.transaction.aggregate({
+            where: { ...baseFilter, type: "deposit" },
+            _sum: { amount: true },
+          }),
+          tx.transaction.aggregate({
+            where: { ...baseFilter, type: "investment" },
+            _sum: { amount: true },
+          }),
+          tx.transaction.aggregate({
+            where: { ...baseFilter, type: "withdrawal" },
+            _sum: { amount: true },
+          }),
+          tx.transaction.aggregate({
+            where: { ...baseFilter, type: "capitalReturn" },
+            _sum: { amount: true },
+          }),
+        ]);
+
+        const mainWallet =
+          Number(deposits._sum.amount ?? 0) +
+          Number(capitalReturns._sum.amount ?? 0) -
+          Number(investments._sum.amount ?? 0) -
+          Number(withdrawals._sum.amount ?? 0);
+
+        if (mainWallet < Number(amount)) {
+          throw new Error("Insufficient wallet balance");
         }
-      }
 
-      res.status(201).json({
-        success: true,
-        transaction,
-      });
-      return; // <-- optional, for readability
-    }
+        // 2️⃣ Validate plan
+        const plan = await tx.plan.findUnique({
+          where: { id: planId },
+        });
 
-    // ✅ Investment transaction
-    const user = await User.findById(req.user._id);
-    if (!user) {
-      res.status(404);
-      throw new Error("User not found");
-    }
+        if (!plan || plan.status !== "active") {
+          throw new Error("Invalid or inactive plan");
+        }
 
-    const planData = await Plan.findById(planId);
-    console.log("📊 Selected Plan:", planData);
+        // Fixed plan validation
+        if (plan.planType === "fixed" && Number(plan.amount) !== Number(amount)) {
+          throw new Error("Invalid fixed plan amount");
+        }
 
-    if (!planData) {
-      res.status(404);
-      throw new Error("Plan not found");
-    }
+        // Range plan validation
+        if (
+          plan.planType === "range" &&
+          (Number(amount) < Number(plan.minAmount) ||
+            Number(amount) > Number(plan.maxAmount))
+        ) {
+          throw new Error("Amount outside allowed range");
+        }
 
-    if (walletType === "main" && user.mainWallet < amount) {
-      res.status(400);
-      throw new Error("Insufficient balance in main wallet");
-    }
-
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
-    try {
-      // Determine first ROI payout time
-      let nextPayoutAt = new Date();
-      if (planData.returnPeriod === "hour") {
-        nextPayoutAt.setHours(nextPayoutAt.getHours() + 1);
-      } else if (planData.returnPeriod === "daily") {
-        nextPayoutAt.setDate(nextPayoutAt.getDate() + 1);
-      } else if (planData.returnPeriod === "weekly") {
-        nextPayoutAt.setDate(nextPayoutAt.getDate() + 7);
-      } else {
-        // default fallback (1 day)
-        nextPayoutAt.setDate(nextPayoutAt.getDate() + 1);
-      }
-
-      console.log("🕒 nextPayoutAt:", nextPayoutAt);
-
-      const investment = await Transaction.create(
-        [
-          {
-            user: user._id,
-            plan: planData._id,
-            type: "investment",
-            amount,
-            status: "success",
-            currency: "USD",
-            nextPayoutAt,
-            roiAccrued: 0,
-            durationInDays: planData.durationInDays,
+        // 3️⃣ Create investment record
+        const investment = await tx.investment.create({
+          data: {
+            userId,
+            planId,
+            amount: Number(amount),
+            initialAmount: Number(amount),
+            roiRate: Number(plan.roiValue || 0),
+            roiInterval: plan.returnPeriod,
           },
-        ],
-        { session }
-      );
+        });
 
-      user.mainWallet -= amount;
+        // 4️⃣ Create transaction (THIS is the deduction)
+        const transaction = await tx.transaction.create({
+          data: {
+            userId,
+            planId,
+            type: "investment",
+            amount: Number(amount),
+            currency,
+            status: "success",
+            reference: getReference(),
+          },
+        });
 
-      const bonusAmount = amount * 0.2;
-      user.profitWallet += bonusAmount;
+        // 5️⃣ Create 10% bonus
+        const bonusAmount = Number(amount) * 0.1;
 
-      await Transaction.create(
-        [
-          {
-            user: user._id,
+        const bonusTransaction = await tx.transaction.create({
+          data: {
+            userId,
             type: "bonus",
             bonusType: "investment",
             amount: bonusAmount,
+            currency,
             status: "success",
-            currency: "USD",
+            reference: getReference(),
           },
-        ],
-        { session }
-      );
+        });
 
-      await user.save({ session });
-      await session.commitTransaction();
-      session.endSession();
-
-      await sendNotification(
-        String(user._id),
-        "Investment Created",
-        `You have successfully invested $${amount} in ${planData.name}.`,
-        "investment"
-      );
+        return { investment, transaction, bonusTransaction };
+        });
 
       res.status(201).json({
-        success: true,
-        message: "Investment successful ✅",
-        investment,
+        message: "Investment successful",
+        data: result,
       });
-    } catch (error: any) {
-      await session.abortTransaction();
-      session.endSession();
-      console.error("Investment failed:", error); // log for debugging
-      res
-        .status(400)
-        .json({ message: error.message || "Investment failed", error });
+
+      return;
     }
+
+    // ==============================
+    // ✅ WITHDRAWAL LOGIC
+    // ==============================
+
+    if (type === "withdrawal") {
+      const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        // 1️⃣ Compute mainWallet and profitWallet inside transaction
+        const baseFilter = { userId, status: "success" };
+
+        const [
+          deposits,
+          investments,
+          withdrawals,
+          capitalReturns,
+          profits,
+        ] = await Promise.all([
+          tx.transaction.aggregate({ where: { ...baseFilter, type: "deposit" }, _sum: { amount: true } }),
+          tx.transaction.aggregate({ where: { ...baseFilter, type: "investment" }, _sum: { amount: true } }),
+          tx.transaction.aggregate({ where: { ...baseFilter, type: "withdrawal" }, _sum: { amount: true } }),
+          tx.transaction.aggregate({ where: { ...baseFilter, type: "capitalReturn" }, _sum: { amount: true } }),
+          tx.transaction.aggregate({ where: { ...baseFilter, type: { in: ["roi", "bonus"] } }, _sum: { amount: true } }),
+        ]);
+
+        const mainWallet = Number(deposits._sum.amount ?? 0) + Number(capitalReturns._sum.amount ?? 0) - Number(investments._sum.amount ?? 0) - Number(withdrawals._sum.amount ?? 0);
+        const profitWallet = Number(profits._sum.amount ?? 0);
+
+        if (mainWallet + profitWallet < Number(amount)) {
+          throw new Error("Insufficient wallet balance");
+        }
+
+        // 2️⃣ Ensure at least one completed investment exists
+        const completedInvestments = await prisma.investment.findMany({
+          where: { userId, status: "completed" },
+        });
+
+        if (completedInvestments.length === 0) {
+          res.status(400);
+          throw new Error("You need at least one completed investment to withdraw");
+        }
+
+        // 3️⃣ Referral requirement check
+        const user = await tx.user.findUnique({ where: { id: userId } });
+        if (user?.referredBy) {
+          const referredUsers = await tx.user.findMany({
+            where: { referredBy: userId },
+            select: { id: true },
+          });
+
+          if (referredUsers.length === 0) {
+            throw new Error("You must have at least one referred user to withdraw");
+          }
+
+          const referredUserIds: string[] = referredUsers.map((u: { id: string }) => u.id);
+
+          const successfulReferralDeposit = await tx.transaction.findFirst({
+            where: {
+              userId: { in: referredUserIds },
+              type: "deposit",
+              status: "success",
+            },
+          });
+
+          if (!successfulReferralDeposit) {
+            throw new Error(
+              "At least one of your referred users must have made a successful deposit before you can withdraw"
+            );
+          }
+        }
+
+        // 3️⃣ Create withdrawal transaction
+        const withdrawalTxn = await tx.transaction.create({
+          data: {
+            userId,
+            type: "withdrawal",
+            amount: Number(amount),
+            currency,
+            status: "pending", // Or "success" if auto-approved
+            reference: getReference(),
+          },
+        });
+
+        return withdrawalTxn;
+      });
+
+      res.status(201).json({ message: "Withdrawal request successful", data: result });
+      return;
+    }
+
+    // ==============================
+    // ✅ OTHER TRANSACTIONS
+    // ==============================
+
+
+    const txn = await prisma.transaction.create({
+      data: {
+        userId,
+        type,
+        amount: Number(amount),
+        currency,
+        planId: planId || undefined,
+        status:
+          type === "deposit" ? "pending" : "pending", // Adjust if needed
+        reference: getReference(),
+      },
+    });
+
+    res.status(201).json(txn);
   }
 );
 
+// Get all transactions (admin)
+export const getAllTransactions = asyncHandler(async (req: any, res: Response): Promise<void> => {
+  try {
+    const transactions = await prisma.transaction.findMany({
+      include: {
+        user: {
+          select: { name: true, email: true },
+        },
+        plan: {
+          select: {
+            name: true,
+            icon: true,
+            roiValue: true,
+            roiUnit: true,
+            planType: true,
+            capitalBack: true,
+            numOfPeriods: true,
+            returnPeriod: true,
+            badge: true,
+            durationInDays: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json(transactions);
+    return;
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching transactions" });
+    return;
+  }
+});
+
 // Get user transactions
 export const getUserTransactions = asyncHandler(
-  async (req: Request, res: Response) => {
+  async (req: any, res: Response) => {
     try {
       if (!req.user) {
         res.status(401);
         throw new Error("Not authorized");
       }
-
-      const transactions = await Transaction.find({ user: req.user._id })
-        .populate(
-          "plan",
-          "name icon roiValue roiUnit planType capitalBack numOfPeriods returnPeriod badge durationInDays"
-        )
-        .sort({
-          createdAt: -1,
-        });
-
-      res.json(transactions);
-    } catch (error) {
-      res.status(500).json({ message: "Error fetching transactions" });
+      const transactions = await prisma.transaction.findMany({
+        where: { userId: req.user.id},
+        include: {
+          plan: {
+            select: {
+              name: true,
+              icon: true,
+              roiValue: true,
+              roiUnit: true,
+              planType: true,
+              capitalBack: true,
+              numOfPeriods: true,
+              returnPeriod: true,
+              badge: true,
+              durationInDays: true,
+            },
+          },
+          investment: true,
+        },
+        
+        orderBy: { createdAt: "desc" },
+      });
+      res.json(
+        transactions.map((tx: any) => ({
+          ...tx,
+          roiEarned: tx.investment?.roiEarned
+          ? Number(tx.investment.roiEarned)
+          : 0,
+        }))
+      );
+    } catch (error: any) {
+      console.error("🔥 getUserTransactions error:", error);
+      res.status(500).json({
+        message: "Error fetching transactions",
+        error: error.message,
+      });
     }
   }
 );
 
-// Get all transactions (Admin only)
-export const getAllTransactions = asyncHandler(
-  async (req: Request, res: Response) => {
-    try {
-      const transactions = await Transaction.find()
-        .populate("user", "name email role")
-        .sort({ createdAt: -1 });
 
-      res.json(transactions);
-    } catch (error) {
-      res.status(500).json({ message: "Error fetching transactions" });
+// Get user Investments
+export const getUserInvestments = asyncHandler(
+  async (req: any, res: Response) => {
+    if (!req.user) {
+      res.status(401);
+      throw new Error("Not authorized");
     }
+
+    const investments = await prisma.investment.findMany({
+      where: {
+        userId: req.user.id,
+      },
+      include: {
+        plan: {
+          select: {
+            id: true,
+            name: true,
+            icon: true,
+            roiValue: true,
+            roiUnit: true,
+            planType: true,
+            capitalBack: true,
+            numOfPeriods: true,
+            returnPeriod: true,
+            badge: true,
+            durationInDays: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    // Convert Prisma Decimal safely
+    const formatted = investments.map((inv:any) => ({
+      ...inv,
+      amount: Number(inv.amount.toString()),
+      initialAmount: Number(inv.initialAmount.toString()),
+      roiRate: Number(inv.roiRate.toString()),
+      roiEarned: Number(inv.roiEarned.toString()),
+    }));
+
+    res.json(formatted);
   }
-);
+); 
+
+
 
 /**
  * Update transaction status (admin).
  * If status becomes "completed" (and wasn't completed already), update user wallets in same DB transaction.
  */
 export const updateTransactionStatus = asyncHandler(
-  async (req: Request, res: Response) => {
-    const { id } = req.params;
+  async (req: any, res: Response): Promise<void> => {
+    let id = req.params.id;
+    id = Array.isArray(id) ? id[0] : id;
     const { status } = req.body;
-
     if (!["pending", "success", "failed"].includes(status)) {
       res.status(400);
       throw new Error("Invalid status");
     }
-
-    // Start session
-    const session = await mongoose.startSession();
-
     try {
-      let updatedTransaction;
+      const txn = await prisma.transaction.findUnique({ where: { id } });
+      if (!txn) {
+        res.status(404).json({ message: "Transaction not found" });
+        return;
+      }
+      const prevStatus = txn.status;
+      const updatedTransaction = await prisma.transaction.update({
+        where: { id },
+        data: { status },
+      });
+      // Apply wallet update only on first-time success
+      if (prevStatus !== "success" && status === "success") {
+        // Apply main wallet logic (implement logic as needed)
+        // If deposit transaction → trigger deposit bonus
+        if (txn.type === "deposit") {
+          const user = await prisma.user.findUnique({
+            where: { id: txn.userId },
+          });
 
-      await session.withTransaction(
-        async () => {
-          // Fetch transaction in session
-          const txn = await Transaction.findById(id).session(session);
-          if (!txn) {
-            throw new Error("Transaction not found");
+          if (user) {
+            const bonusAmount = Number(txn.amount) * 0.1;
+
+            // Create BONUS transaction only
+            await prisma.transaction.create({
+              data: {
+                userId: user.id,
+                type: "bonus",
+                bonusType: "deposit",
+                amount: bonusAmount,
+                status: "success",
+                currency: txn.currency || "USD",
+                reference: getReference(),
+              },
+            });
+
+            console.log(
+              `✅ Deposit bonus of $${bonusAmount.toFixed(2)} created for ${user.email}`
+            );
           }
-
-          const prevStatus = txn.status;
-
-          // Update status
-          txn.status = status;
-          await txn.save({ session });
-
-          // Apply wallet update only on first-time success
-          if (prevStatus !== "success" && status === "success") {
-            // Apply main wallet logic
-            await applyTransactionToWalletAtomic(txn, session);
-
-            // ✅ If deposit transaction → trigger deposit bonus
-            if (txn.type === "deposit") {
-              const user = await User.findById(txn.user).session(session);
-              if (user) {
-                const bonusAmount = txn.amount * 0.1; // 10% bonus
-
-                // Update profit wallet
-                user.profitWallet += bonusAmount;
-                await user.save({ session });
-
-                // Create bonus transaction
-                await Transaction.create(
-                  [
-                    {
-                      user: user._id,
-                      type: "bonus",
-                      bonusType: "deposit",
-                      amount: bonusAmount,
-                      status: "success",
-                      currency: txn.currency || "USD",
-                    },
-                  ],
-                  { session }
-                );
-
-                console.log(
-                  `✅ Deposit bonus of $${bonusAmount.toFixed(2)} created for ${
-                    user.email
-                  }`
-                );
-              }
-            }
-          }
-
-          // Return updated transaction
-          updatedTransaction = txn;
-        },
-        {
-          readPreference: "primary",
-          readConcern: { level: "local" },
-          writeConcern: { w: "majority" },
         }
-      );
-
-      // ✅ Transaction committed successfully
+      }
       res.json(updatedTransaction);
     } catch (err: unknown) {
-      console.error("Error updating transaction status with session:", err);
+      console.error("Error updating transaction status:", err);
       res.status(500).json({
         message:
           err instanceof Error
             ? err.message
             : "Error updating transaction status",
       });
-    } finally {
-      session.endSession();
     }
   }
 );
 
 export const getUserBalances = asyncHandler(
-  async (req: Request, res: Response) => {
+  async (req: any, res: Response) => {
     if (!req.user) {
       res.status(401);
       throw new Error("Not authorized");
     }
 
-    const user = await User.findById(req.user._id).select(
-      "mainWallet profitWallet"
-    );
-    if (!user) {
-      res.status(404);
-      throw new Error("User not found");
-    }
+    const userId = req.user.id;
+
+    const baseFilter = {
+      userId,
+      status: "success",
+    };
+
+    // Run all aggregates in parallel
+    const [
+      deposits,
+      investments,
+      withdrawals,
+      capitalReturns,
+      profits,
+    ] = await Promise.all([
+      prisma.transaction.aggregate({
+        where: { ...baseFilter, type: "deposit" },
+        _sum: { amount: true },
+      }),
+      prisma.transaction.aggregate({
+        where: { ...baseFilter, type: "investment" },
+        _sum: { amount: true },
+      }),
+      prisma.transaction.aggregate({
+        where: { ...baseFilter, type: "withdrawal" },
+        _sum: { amount: true },
+      }),
+      prisma.transaction.aggregate({
+        where: { ...baseFilter, type: "capitalReturn" },
+        _sum: { amount: true },
+      }),
+      prisma.transaction.aggregate({
+        where: {
+          ...baseFilter,
+          type: { in: ["roi", "bonus"] },
+        },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const totalDeposit = Number(deposits._sum.amount ?? 0);
+    const totalInvestment = Number(investments._sum.amount ?? 0);
+    const totalWithdrawal = Number(withdrawals._sum.amount ?? 0);
+    const totalCapitalReturn = Number(capitalReturns._sum.amount ?? 0);
+    const totalProfit = Number(profits._sum.amount ?? 0);
+
+    const mainWallet =
+      totalDeposit +
+      totalCapitalReturn -
+      totalInvestment -
+      totalWithdrawal;
+
+    const profitWallet = totalProfit;
 
     res.json({
-      mainWallet: user.mainWallet,
-      profitWallet: user.profitWallet,
-      accountBalance: user.mainWallet + user.profitWallet,
+      mainWallet,
+      profitWallet,
+      accountBalance: mainWallet + profitWallet,
+      breakdown: {
+        totalDeposit,
+        totalInvestment,
+        totalWithdrawal,
+        totalCapitalReturn,
+        totalProfit,
+      },
     });
   }
 );
 
 // server/src/controllers/transactionController.ts
 export const getUserDashboardStats = asyncHandler(
-  async (req: Request, res: Response) => {
+  async (req: any, res: Response) => {
     if (!req.user) {
       res.status(401);
       throw new Error("Not authorized");
     }
-
-    const userId = req.user._id;
-
-    const transactions = await Transaction.find({
-      user: userId,
-      status: "success",
+    const userId = req.user.id;
+    const transactions = await prisma.transaction.findMany({
+      where: { userId, status: "success" },
     });
-
     // Aggregate totals
     const totals: Record<string, number> = {
       deposit: 0,
@@ -383,35 +553,23 @@ export const getUserDashboardStats = asyncHandler(
       withdrawal: 0,
       roi: 0,
     };
-
     let referralBonus = 0;
     let depositBonus = 0;
     let investmentBonus = 0;
-    let signupBonus = 0; // ✅ new
-
-    transactions.forEach((txn) => {
+    let signupBonus = 0;
+    transactions.forEach((txn: any) => {
       if (txn.type === "bonus") {
-        if (txn.bonusType === "referral") referralBonus += txn.amount;
-        if (txn.bonusType === "deposit") depositBonus += txn.amount;
-        if (txn.bonusType === "investment") investmentBonus += txn.amount;
-        if (txn.bonusType === "signup") signupBonus += txn.amount; // ✅ new
+        if (txn.bonusType === "referral") referralBonus += Number(txn.amount);
+        if (txn.bonusType === "deposit") depositBonus += Number(txn.amount);
+        if (txn.bonusType === "investment") investmentBonus += Number(txn.amount);
+        if (txn.bonusType === "signup") signupBonus += Number(txn.amount);
       } else {
-        totals[txn.type] = (totals[txn.type] || 0) + txn.amount;
-
-        // ✅ Include ROI directly in profit total
-        if (txn.type === "roi") totals.profit += txn.amount;
+        totals[txn.type] = (totals[txn.type] || 0) + Number(txn.amount);
+        if (txn.type === "roi") totals.profit += Number(txn.amount);
       }
     });
-
-    const referrals = await User.countDocuments({ referredBy: userId });
-
-    const totalProfit =
-      totals.profit +
-      referralBonus +
-      depositBonus +
-      investmentBonus +
-      signupBonus;
-
+    const referrals = await prisma.user.count({ where: { referredBy: userId } });
+    const totalProfit = totals.profit + referralBonus + depositBonus + investmentBonus + signupBonus;
     res.json({
       allTransactions: transactions.length,
       totalDeposit: totals.deposit,
@@ -421,7 +579,7 @@ export const getUserDashboardStats = asyncHandler(
       referralBonus,
       depositBonus,
       investmentBonus,
-      signupBonus, // ✅ include in response
+      signupBonus,
       totalReferrals: referrals,
     });
   }

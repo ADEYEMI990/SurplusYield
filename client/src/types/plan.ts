@@ -1,6 +1,6 @@
 // client/src/types/plan.ts
 export interface Plan {
-  _id?: string;
+  id?: string;
   name: string;
   badge: string;
   planType: "fixed" | "range";

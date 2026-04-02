@@ -43,12 +43,12 @@ export default function PlansPage() {
   };
 
   const handleToggleStatus = async (plan: Plan) => {
-    if (!plan._id) return;
+    if (!plan.id) return;
     const newStatus = plan.status === "active" ? "deactivated" : "active";
-    setLoadingId(plan._id);
+    setLoadingId(plan.id);
 
     try {
-      await API.put(`/plans/${plan._id}`, { status: newStatus });
+      await API.put(`/plans/${plan.id}`, { status: newStatus });
       toast.success(`Plan ${newStatus === "active" ? "activated" : "deactivated"} successfully`);
       fetchPlans();
     } catch {
@@ -169,14 +169,14 @@ export default function PlansPage() {
                 <Button
                   size="sm"
                   variant="danger"
-                  onClick={() => plan._id && handleDelete(plan._id)}
+                  onClick={() => plan.id && handleDelete(plan.id)}
                 >
                   Delete
                 </Button>
                 <Button
                   size="sm"
                   variant={plan.status === "active" ? "outline" : "primary"}
-                  loading={loadingId === plan._id}
+                  loading={loadingId === plan.id}
                   onClick={() => handleToggleStatus(plan)}
                 >
                   {plan.status === "active" ? "Deactivate" : "Activate"}

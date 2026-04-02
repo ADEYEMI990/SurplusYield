@@ -1,5 +1,6 @@
 import express from "express";
 import { protect, admin } from "../middleware/authMiddleware";
+import { upload } from "../middleware/s3Upload";
 import {
   createKycForm,
   getAllKycForms,
@@ -25,7 +26,7 @@ router.put("/admin/submissions/:id/status", protect, admin, updateKycStatus);
 
 /* =============== USER ROUTES =============== */
 router.get("/forms/active", protect, getActiveKycForms);
-router.post("/submit", protect, submitUserKyc);
+router.post("/submit", protect, upload.any(), submitUserKyc);
 router.get("/my", protect, getUserKyc);
 
 export default router;

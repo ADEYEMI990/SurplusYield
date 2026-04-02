@@ -1,13 +1,14 @@
+// src/controllers/kycController.ts
+
 import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
-import { KycForm, KycSubmission } from "../models/kyc";
-import User from "../models/User";
+import prisma from "../lib/prisma";
 import { sendNotification } from "../utils/notify";
 
 /* ===================== ADMIN ===================== */
 
 /* ============================================
-   ✅ CREATE NEW KYC FORM
+   CREATE NEW KYC FORM
 ============================================ */
 export const createKycForm = async (req: Request, res: Response) => {
   try {
@@ -33,18 +34,17 @@ export const createKycForm = async (req: Request, res: Response) => {
       }
     }
 
-    const existing = await KycForm.findOne({ name });
+    const existing = await prisma.kycForm.findFirst({ where: { name } });
     if (existing) {
       return res.status(400).json({ message: "KYC Form already exists" });
     }
-
-    const newForm = await KycForm.create({
-      name,
-      fields,
-      status: status || "active",
+    const newForm = await prisma.kycForm.create({
+      data: {
+        name,
+        fields,
+        status: status || "active",
+      },
     });
-
-    console.log("✅ Created new KYC form:", newForm);
     res.status(201).json({
       message: "KYC form created successfully",
       form: newForm,
@@ -60,7 +60,7 @@ export const createKycForm = async (req: Request, res: Response) => {
 ============================================ */
 export const getAllKycForms = async (req: Request, res: Response) => {
   try {
-    const forms = await KycForm.find().sort({ createdAt: -1 });
+    const forms = await prisma.kycForm.findMany({ orderBy: { createdAt: "desc" } });
     res.status(200).json({ forms });
   } catch (err: any) {
     console.error("❌ Error fetching KYC forms:", err);
@@ -73,7 +73,8 @@ export const getAllKycForms = async (req: Request, res: Response) => {
 ============================================ */
 export const updateKycForm = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    let id = req.params.id;
+    id = Array.isArray(id) ? id[0] : id;
     const { name, fields, status } = req.body;
 
     // Validation
@@ -81,7 +82,7 @@ export const updateKycForm = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Invalid KYC form data" });
     }
 
-    const form = await KycForm.findById(id);
+    const form = await prisma.kycForm.findUnique({ where: { id } });
     if (!form) {
       return res.status(404).json({ message: "KYC Form not found" });
     }
@@ -99,15 +100,13 @@ export const updateKycForm = async (req: Request, res: Response) => {
       }
     }
 
-    form.name = name;
-    form.fields = fields;
-    form.status = status || form.status;
-    await form.save();
-
-    console.log(`✅ Updated KYC form: ${form._id}`);
+    const updatedForm = await prisma.kycForm.update({
+      where: { id },
+      data: { name, fields, status: status || form.status },
+    });
     res.status(200).json({
       message: "KYC form updated successfully",
-      form,
+      form: updatedForm,
     });
   } catch (err: any) {
     console.error("❌ Error updating KYC form:", err);
@@ -120,14 +119,9 @@ export const updateKycForm = async (req: Request, res: Response) => {
 ============================================ */
 export const deleteKycForm = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const deleted = await KycForm.findByIdAndDelete(id);
-
-    if (!deleted) {
-      return res.status(404).json({ message: "KYC form not found" });
-    }
-
-    console.log(`🗑️ Deleted KYC form: ${deleted._id}`);
+    let id = req.params.id;
+    id = Array.isArray(id) ? id[0] : id;
+    const deleted = await prisma.kycForm.delete({ where: { id } });
     res.status(200).json({ message: "KYC form deleted successfully" });
   } catch (err: any) {
     console.error("❌ Error deleting KYC form:", err);
@@ -140,8 +134,9 @@ export const deleteKycForm = async (req: Request, res: Response) => {
 // ✅ Get active KYC forms (for user selection)
 export const getActiveKycForms = asyncHandler(
   async (_req: Request, res: Response): Promise<void> => {
-    const activeForms = await KycForm.find({ status: "active" }).sort({
-      createdAt: -1,
+    const activeForms = await prisma.kycForm.findMany({
+      where: { status: "active" },
+      orderBy: { createdAt: "desc" },
     });
     res.json(activeForms);
   }
@@ -150,74 +145,178 @@ export const getActiveKycForms = asyncHandler(
 // ✅ Submit user KYC
 // ✅ Submit user KYC (allow resubmit if rejected)
 export const submitUserKyc = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    const userId = req.user?._id;
-    const { formId, fields } = req.body;
+  async (req: any, res: Response): Promise<void> => {
+    console.log("========= KYC SUBMISSION START =========");
 
-    if (!userId) {
-      res.status(401).json({ message: "Unauthorized" });
-      return;
-    }
+    try {
+      /* ================= USER ================= */
+      const userId = req.user?.id;
+      console.log("User ID:", userId);
 
-    const existing = await KycSubmission.findOne({
-      user: userId,
-      form: formId,
-    });
-
-    // 🔒 If there's an existing submission
-    if (existing) {
-      if (existing.status === "pending") {
-        res
-          .status(400)
-          .json({ message: "KYC already submitted and pending review" });
-        return;
-      }
-      if (existing.status === "approved") {
-        res
-          .status(400)
-          .json({ message: "KYC already approved — cannot resubmit" });
+      if (!userId) {
+        console.log("❌ No userId found");
+        res.status(401).json({ message: "Unauthorized" });
         return;
       }
 
-      // 🟢 If rejected, allow resubmission: update fields + reset status
-      existing.fields = fields;
-      existing.status = "pending";
-      existing.reason = ""; // clear rejection reason
-      await existing.save();
+      /* ================= BODY ================= */
+      console.log("Raw req.body:", req.body);
 
-      await User.findByIdAndUpdate(userId, { kycStatus: "pending" });
+      let { formId, fields } = req.body;
 
-      res.status(200).json({
-        message: "KYC re-submitted successfully",
-        submission: existing,
+      console.log("Form ID:", formId);
+      console.log("Fields (before parse):", fields);
+
+      /* ================= PARSE FIELDS ================= */
+
+      if (!fields) {
+        console.log("⚠️ fields is undefined, setting empty object");
+        fields = {};
+      }
+
+      if (typeof fields === "string") {
+        try {
+          fields = JSON.parse(fields);
+          console.log("Fields parsed successfully:", fields);
+        } catch (err) {
+          console.error("❌ JSON.parse(fields) failed:", err);
+          res.status(400).json({ message: "Invalid fields JSON" });
+          return;
+        }
+      }
+
+      /* ================= FILES ================= */
+
+      console.log("Raw req.files:", req.files);
+
+      if (req.files && Array.isArray(req.files)) {
+        req.files.forEach((file: any) => {
+          console.log("Uploaded File:", {
+            fieldname: file.fieldname,
+            location: file.location,
+            originalname: file.originalname,
+          });
+
+          if (file.location) {
+            fields[file.fieldname] = file.location;
+          }
+        });
+      }
+
+      console.log("Fields after file injection:", fields);
+
+      /* ================= EXISTING SUBMISSION ================= */
+
+      console.log("Checking existing submission...");
+
+      const existing = await prisma.kycSubmission.findFirst({
+        where: { userId, formId },
       });
-      return;
+
+      console.log("Existing submission:", existing);
+
+      /* ================= RESUBMISSION ================= */
+
+      if (existing) {
+        if (existing.status === "pending") {
+          console.log("❌ Submission already pending");
+
+          res.status(400).json({
+            message: "KYC already submitted and pending review",
+          });
+          return;
+        }
+
+        if (existing.status === "approved") {
+          console.log("❌ Submission already approved");
+
+          res.status(400).json({
+            message: "KYC already approved — cannot resubmit",
+          });
+          return;
+        }
+
+        console.log("Updating rejected submission...");
+
+        const updated = await prisma.kycSubmission.update({
+          where: { id: existing.id },
+          data: {
+            fields,
+            status: "pending",
+            reason: "",
+          },
+        });
+
+        console.log("Submission updated:", updated);
+
+        await prisma.user.update({
+          where: { id: userId },
+          data: { kycStatus: "pending" },
+        });
+
+        console.log("User KYC status updated");
+
+        res.status(200).json({
+          message: "KYC re-submitted successfully",
+          submission: updated,
+        });
+
+        console.log("========= KYC RESUBMISSION COMPLETE =========");
+
+        return;
+      }
+
+      /* ================= CREATE NEW ================= */
+
+      console.log("Creating new KYC submission...");
+
+      const submission = await prisma.kycSubmission.create({
+        data: {
+          userId,
+          formId,
+          fields,
+          status: "pending",
+        },
+      });
+
+      console.log("New submission created:", submission);
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: { kycStatus: "pending" },
+      });
+
+      console.log("User KYC status updated to pending");
+
+      res.status(201).json({
+        message: "KYC submitted successfully",
+        submission,
+      });
+
+      console.log("========= KYC SUBMISSION COMPLETE =========");
+    } catch (error) {
+      console.error("🔥 KYC SUBMISSION ERROR:", error);
+
+      res.status(500).json({
+        message: "Internal Server Error",
+      });
     }
-
-    // 🆕 First-time submission
-    const submission = await KycSubmission.create({
-      user: userId,
-      form: formId,
-      fields,
-      status: "pending",
-    });
-
-    await User.findByIdAndUpdate(userId, { kycStatus: "pending" });
-
-    res.status(201).json({ message: "KYC submitted successfully", submission });
   }
 );
 
 // ✅ Get user’s submitted KYC
 export const getUserKyc = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    const userId = req.user?._id;
+  async (req: any, res: Response): Promise<void> => {
+    const userId = req.user?.id;
     if (!userId) {
       res.status(401).json({ message: "Unauthorized" });
       return;
     }
 
-    const kyc = await KycSubmission.find({ user: userId }).populate("form");
+    const kyc = await prisma.kycSubmission.findMany({
+      where: { userId },
+      include: { form: true },
+    });
     res.json(kyc);
   }
 );
@@ -228,12 +327,14 @@ export const getUserKyc = asyncHandler(
 export const getAllKycSubmissions = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
     const { status } = req.query;
-    const query = status ? { status } : {};
-    const submissions = await KycSubmission.find(query)
-      .populate("user", "name email")
-      .populate("form", "name")
-      .sort({ createdAt: -1 });
-
+    const submissions = await prisma.kycSubmission.findMany({
+      where: status ? { status: status as string } : {},
+      include: {
+        user: { select: { name: true, email: true } },
+        form: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
     res.json(submissions);
   }
 );
@@ -241,33 +342,28 @@ export const getAllKycSubmissions = asyncHandler(
 // ✅ Approve or Reject KYC
 export const updateKycStatus = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const { id } = req.params;
+    let id = req.params.id;
+    id = Array.isArray(id) ? id[0] : id;
     const { status, reason } = req.body; // "approved" | "rejected"
 
-    const kyc = await KycSubmission.findById(id);
+    const kyc = await prisma.kycSubmission.findUnique({ where: { id } });
     if (!kyc) {
       res.status(404).json({ message: "KYC submission not found" });
       return;
     }
-
-    kyc.status = status;
-    if (reason) {
-      kyc.reason = reason; // ✅ store rejection reason
-    }
-    await kyc.save();
-
-    // update user profile KYC status
-    await User.findByIdAndUpdate(kyc.user, { kycStatus: status });
-
+    const updated = await prisma.kycSubmission.update({
+      where: { id },
+      data: { status, reason: reason || undefined },
+    });
+    await prisma.user.update({ where: { id: kyc.userId }, data: { kycStatus: status } });
     await sendNotification(
-      kyc.user.toString(),
+      kyc.userId,
       `KYC ${status === "approved" ? "Approved" : "Rejected"}`,
       status === "approved"
         ? "Your KYC has been successfully approved."
         : `Your KYC was rejected. ${reason ? `Reason: ${reason}` : ""}`,
       "kyc"
     );
-
     res.json({ message: `KYC ${status}` });
   }
 );

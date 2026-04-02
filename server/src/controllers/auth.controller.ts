@@ -2,11 +2,10 @@ import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
 import bcrypt from "bcryptjs";
 import jwt, { SignOptions } from "jsonwebtoken";
-import User from "../models/User";
-import Admin from "../models/Admin";
-import { Transaction } from "../models/Transaction";
-import mongoose from "mongoose";
+import prisma from "../lib/prisma";
+
 import { sendNotification } from "../utils/notify";
+import { getReference } from "../utils/getReference";
 
 // Helper: strong password validation
 function isStrongPassword(password: string): boolean {
@@ -53,7 +52,7 @@ export const registerUser = asyncHandler(
       );
     }
 
-    const userExists = await User.findOne({ email });
+    const userExists = await prisma.user.findUnique({ where: { email } });
     if (userExists) {
       res.status(400);
       throw new Error("User already exists");
@@ -65,98 +64,72 @@ export const registerUser = asyncHandler(
 
     // Generate unique referral code
     let referralCode = generateReferralCode(name, email);
-    while (await User.findOne({ referralCode })) {
+    while (await prisma.user.findUnique({ where: { referralCode } })) {
       referralCode = generateReferralCode(name, email);
     }
 
-    // Start transaction session
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
     try {
-      let referredBy: mongoose.Schema.Types.ObjectId | undefined;
-      let referrer: any = null;
-
-      // 🔹 Create the new user first (signup bonus included)
-      const user = new User({
-        name,
-        email,
-        password: hashedPassword,
-        role: role || "user",
-        referralCode,
-        profitWallet: 20, // signup bonus
+      // Create user with signup bonus
+      const user = await prisma.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          role: role || "user",
+          referralCode,
+        },
       });
 
-      await user.save({ session });
-
       // Log signup bonus transaction
-      await Transaction.create(
-        [
-          {
-            user: user._id,
-            type: "bonus",
-            bonusType: "signup",
-            amount: 20,
-            status: "success",
-          },
-        ],
-        { session }
-      );
+      await prisma.transaction.create({
+        data: {
+          userId: user.id,
+          type: "bonus",
+          bonusType: "signup",
+          amount: 20,
+          status: "success",
+          reference: getReference(),
+        },
+      });
 
       await sendNotification(
-        String(user._id),
-        "Welcome to SurplusYield!",
-        "Your account has been created successfully, and a signup bonus of $20 has been credited to your profit wallet.",
+        String(user.id),
+        "Welcome to CashAppInvest!",
+        "Your account has been created successfully, and a signup bonus of $20 has been credited to your profit wallet."
       );
 
-      // 🔹 Handle referral AFTER user creation is successful
+      // Handle referral
       if (providedReferral) {
-        referrer = await User.findOne({
-          referralCode: providedReferral,
-        }).session(session);
-
+        const referrer = await prisma.user.findUnique({ where: { referralCode: providedReferral } });
         if (referrer) {
-          referredBy = referrer._id as mongoose.Schema.Types.ObjectId;
-          user.referredBy = referredBy;
-
-          // Add referral bonus to referrer
           const referralBonusAmount = 20;
-          referrer.profitWallet += referralBonusAmount;
-          await referrer.save({ session });
-          await user.save({ session }); // update referredBy in user doc
-
-          // Log referral bonus transaction for referrer
-          await Transaction.create(
-            [
-              {
-                user: referrer._id,
-                type: "bonus",
-                bonusType: "referral",
-                amount: referralBonusAmount,
-                status: "success",
-              },
-            ],
-            { session }
-          );
-
+          
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { referredBy: referrer.id },
+          });
+          await prisma.transaction.create({
+            data: {
+              userId: referrer.id,
+              type: "bonus",
+              bonusType: "referral",
+              amount: referralBonusAmount,
+              status: "success",
+              reference: getReference(),
+            },
+          });
           await sendNotification(
-            String(referrer._id),
+            String(referrer.id),
             "Referral Bonus Earned!",
-            `You have earned a referral bonus of $${referralBonusAmount} for referring a new user.`,
+            `You have earned a referral bonus of $${referralBonusAmount} for referring a new user.`
           );
         }
       }
 
-      // ✅ Commit transaction if everything succeeded
-      await session.commitTransaction();
-      session.endSession();
-
-      console.log("USER FROM DB:", user);
-
       // Build clean response
       const responseData = {
-        _id: user._id,
-        id: user._id,
+        _id: user.id,
+        id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
@@ -166,16 +139,11 @@ export const registerUser = asyncHandler(
         token: generateToken(user.id, user.role),
       };
 
-      console.log("REGISTER RESPONSE:", responseData);
-
       res.status(201).json({
         user: responseData,
         token: responseData.token,
       });
     } catch (err) {
-      // ❌ Rollback on error
-      await session.abortTransaction();
-      session.endSession();
       console.error("Register User Error:", err);
       res.status(500);
       throw new Error("Server error during registration");
@@ -189,15 +157,12 @@ export const loginUser = asyncHandler(async (req: Request, res: Response) => {
   let { email, password } = req.body;
   email = email.toLowerCase().trim();
 
-  const user = await User.findOne({ email });
-
+  const user = await prisma.user.findUnique({ where: { email } });
   if (user && (await bcrypt.compare(password, user.password))) {
-    console.log("USER FROM DB:", user);
-
     const referralUrl = `${process.env.FRONTEND_URL}/auth/register?ref=${user.referralCode}`;
     const responseData = {
-      _id: user._id,
-      id: user._id,
+      _id: user.id,
+      id: user.id,
       name: user.name,
       email: user.email,
       role: user.role,
@@ -206,10 +171,6 @@ export const loginUser = asyncHandler(async (req: Request, res: Response) => {
       referralUrl,
       token: generateToken(user.id, user.role),
     };
-
-    // 🔥 Debug log before response
-    console.log("LOGIN RESPONSE:", responseData);
-
     res.status(201).json({
       user: responseData,
       token: responseData.token,
@@ -239,32 +200,27 @@ export const changePassword = asyncHandler(async (req: any, res: Response) => {
     );
   }
 
-  const user = await User.findById(req.user._id);
+  const user = await prisma.user.findUnique({ where: { id: req.user.id } });
   if (!user) {
     res.status(404);
     throw new Error("User not found");
   }
-
   // Verify old password
   const isMatch = await bcrypt.compare(oldPassword, user.password);
   if (!isMatch) {
     res.status(400);
     throw new Error("Old password is incorrect");
   }
-
   // Hash new password
   const salt = await bcrypt.genSalt(10);
-  user.password = await bcrypt.hash(newPassword, salt);
-  await user.save();
-
+  const newHashed = await bcrypt.hash(newPassword, salt);
+  await prisma.user.update({ where: { id: user.id }, data: { password: newHashed } });
   await sendNotification(
-  String(user._id),
-  "Password Changed",
-  "Your account password has been updated successfully.",
-  "security"
-);
-
-
+    String(user.id),
+    "Password Changed",
+    "Your account password has been updated successfully.",
+    "security"
+  );
   res.status(200).json({ message: "Password changed successfully" });
 });
 
@@ -287,26 +243,22 @@ export const registerAdmin = async (req: Request, res: Response) => {
     }
 
     // check if email exists
-    const existing = await Admin.findOne({ email });
+    const existing = await prisma.admin.findUnique({ where: { email } });
     if (existing) {
       return res.status(400).json({ message: "Email already registered" });
     }
-
-    // hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    const admin = new Admin({
-      username,
-      email,
-      password: hashedPassword,
-      role: role || "admin",
+    const admin = await prisma.admin.create({
+      data: {
+        username,
+        email,
+        password: hashedPassword,
+        role: role || "admin",
+      },
     });
-
-    await admin.save();
-
     res.status(201).json({
       message: "Admin registered successfully",
-      admin: { id: admin._id, email: admin.email, role: admin.role },
+      admin: { id: admin.id, email: admin.email, role: admin.role },
     });
   } catch (error) {
     console.error("Register Admin Error:", error);
@@ -319,32 +271,22 @@ export const loginAdmin = async (req: Request, res: Response) => {
     let { email, password } = req.body;
     email = email.toLowerCase().trim();
 
-    const admin = await Admin.findOne({ email });
-
+    const admin = await prisma.admin.findUnique({ where: { email } });
     if (!admin) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
-
     const passwordMatch = await bcrypt.compare(password, admin.password);
-
     if (!passwordMatch) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
-
-    // generate JWT token (ensure `import jwt from 'jsonwebtoken';` or `import * as jwt from 'jsonwebtoken';` is present)
-    const expiresIn = (process.env.JWT_EXPIRES ??
-      "7d") as SignOptions["expiresIn"];
-    const payload = { id: admin._id, role: admin.role, email: admin.email };
+    const expiresIn = (process.env.JWT_EXPIRES ?? "7d") as SignOptions["expiresIn"];
+    const payload = { id: admin.id, role: admin.role, email: admin.email };
     const jwtSecret = process.env.JWT_SECRET as string;
-    // ✅ explicitly declare SignOptions
-    const options: SignOptions = {
-      expiresIn,
-    };
+    const options: SignOptions = { expiresIn };
     const token = jwt.sign(payload, jwtSecret, options);
-
     res.status(200).json({
       message: "Admin logged in successfully",
-      admin: { id: admin._id, email: admin.email, role: admin.role },
+      admin: { id: admin.id, email: admin.email, role: admin.role },
       token,
     });
   } catch (error) {

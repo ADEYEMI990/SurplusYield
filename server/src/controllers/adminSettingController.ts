@@ -1,22 +1,31 @@
-// server/src/controllers/adminSettingController.ts
-import { Request, Response } from "express";
-import { Setting } from "../models/Setting";
+import { Response } from "express";
+import asyncHandler from "express-async-handler";
+import prisma from "../lib/prisma";
 
-export const getAllSettings = async (_: Request, res: Response) => {
+export const getAllSettings = asyncHandler(async (req: any, res: Response): Promise<void> => {
   try {
-    const settings = await Setting.find();
+    const settings = await prisma.setting.findMany();
     res.json(settings);
+    return;
   } catch {
     res.status(500).json({ message: "Error fetching settings" });
+    return;
   }
-};
+});
 
-export const updateSetting = async (req: Request, res: Response) => {
+export const upsertSetting = asyncHandler(async (req: any, res: Response): Promise<void> => {
   try {
     const { key, value } = req.body;
-    const setting = await Setting.findOneAndUpdate({ key }, { value }, { upsert: true, new: true });
+    let setting = await prisma.setting.findUnique({ where: { key } });
+    if (setting) {
+      setting = await prisma.setting.update({ where: { key }, data: { value } });
+    } else {
+      setting = await prisma.setting.create({ data: { key, value } });
+    }
     res.json(setting);
+    return;
   } catch {
     res.status(500).json({ message: "Error updating setting" });
+    return;
   }
-};
+});

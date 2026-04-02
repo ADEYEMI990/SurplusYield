@@ -1,3 +1,5 @@
+// src/components/admin/CreateKyc.tsx
+
 import { useEffect, useState } from "react";
 import {
   PlusCircle,
@@ -18,7 +20,7 @@ interface KycField {
 }
 
 interface KycForm {
-  _id?: string;
+  id?: string; // ✅ Prisma uses id instead of _id
   name: string;
   fields: KycField[];
   status: "active" | "deactivated";
@@ -36,9 +38,11 @@ export default function CreateKyc() {
   const [status, setStatus] = useState<"active" | "deactivated">("active");
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const [editId, setEditId] = useState<string | null>(null); // ✅ track edit mode
+  const [editId, setEditId] = useState<string | null>(null);
 
-  // ✅ Load all existing KYC forms from backend
+  /* ================================
+     FETCH ALL KYC FORMS
+  ================================= */
   const fetchKycForms = async () => {
     try {
       setFetching(true);
@@ -56,11 +60,15 @@ export default function CreateKyc() {
     fetchKycForms();
   }, []);
 
-  // ✅ Add new field group
+  /* ================================
+     ADD FIELD
+  ================================= */
   const addField = () =>
     setFields((prev) => [...prev, { label: "", type: "text", required: true }]);
 
-  // ✅ Update field dynamically
+  /* ================================
+     UPDATE FIELD
+  ================================= */
   const updateField = <K extends keyof KycField>(
     index: number,
     key: K,
@@ -73,36 +81,50 @@ export default function CreateKyc() {
     });
   };
 
-  // ✅ Remove a field
+  /* ================================
+     REMOVE FIELD
+  ================================= */
   const removeField = (index: number) =>
     setFields((prev) => prev.filter((_, i) => i !== index));
 
-  // ✅ Save or Update KYC form
+  /* ================================
+     SAVE / UPDATE FORM
+  ================================= */
   const handleSave = async () => {
     if (!name.trim()) {
       toast.error("Please enter a form name");
       return;
     }
+
     if (fields.length === 0) {
       toast.error("Add at least one field option");
       return;
     }
 
     setLoading(true);
+
     try {
       if (editId) {
-        // ✅ UPDATE existing KYC form
-        await API.put(`/kyc/admin/forms/${editId}`, { name, fields, status });
+        await API.put(`/kyc/admin/forms/${editId}`, {
+          name,
+          fields,
+          status,
+        });
+
         toast.success(`KYC Form "${name}" updated successfully ✅`);
       } else {
-        // ✅ CREATE new KYC form
-        await API.post("/kyc/admin/forms", { name, fields, status });
+        await API.post("/kyc/admin/forms", {
+          name,
+          fields,
+          status,
+        });
+
         toast.success(`${name} KYC CREATED ✅`);
       }
 
       await fetchKycForms();
 
-      // Reset form
+      /* RESET FORM */
       setShowDropdown(false);
       setName("");
       setFields([]);
@@ -116,17 +138,20 @@ export default function CreateKyc() {
     }
   };
 
-  // ✅ Delete KYC form
+  /* ================================
+     DELETE FORM
+  ================================= */
   const handleDelete = async (index: number) => {
     const form = forms[index];
-    if (!form._id) {
+
+    if (!form.id) {
       setForms((prev) => prev.filter((_, i) => i !== index));
       toast.success(`${form.name} deleted`);
       return;
     }
 
     try {
-      await API.delete(`/kyc/admin/forms/${form._id}`);
+      await API.delete(`/kyc/admin/forms/${form.id}`);
       toast.success(`${form.name} deleted`);
       await fetchKycForms();
     } catch (err) {
@@ -135,16 +160,20 @@ export default function CreateKyc() {
     }
   };
 
-  // ✅ Edit KYC handler
+  /* ================================
+     EDIT FORM
+  ================================= */
   const handleEdit = (form: KycForm) => {
-    setEditId(form._id || null);
+    setEditId(form.id || null);
     setName(form.name);
-    setFields(form.fields);
+    setFields(form.fields || []);
     setStatus(form.status);
     setShowDropdown(true);
   };
 
-  // ✅ Cancel Edit / Reset form
+  /* ================================
+     CANCEL EDIT
+  ================================= */
   const handleCancel = () => {
     setShowDropdown(false);
     setName("");
@@ -155,9 +184,10 @@ export default function CreateKyc() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* ==== HEADER ==== */}
+      {/* HEADER */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-800">KYC Forms</h2>
+
         <div className="flex gap-3">
           <button
             onClick={() => {
@@ -171,6 +201,7 @@ export default function CreateKyc() {
           >
             <PlusCircle size={18} /> ADD NEW
           </button>
+
           <button
             onClick={fetchKycForms}
             disabled={fetching}
@@ -189,15 +220,16 @@ export default function CreateKyc() {
         </div>
       </div>
 
-      {/* ==== DROPDOWN CARD ==== */}
+      {/* CREATE / EDIT FORM */}
       {showDropdown && (
         <div className="bg-white rounded-xl shadow-lg border p-5 space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">
               {editId ? "Edit KYC Form" : "Add New KYC Form"}
             </h3>
+
             <button
-            title="Cancel"
+              title="Cancel"
               onClick={handleCancel}
               className="text-gray-500 hover:text-red-600 transition"
             >
@@ -206,21 +238,16 @@ export default function CreateKyc() {
           </div>
 
           <div className="bg-gray-50 border rounded-lg p-4 space-y-4">
-            {/* Form Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Name
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-400"
-                placeholder="Enter KYC Form Name"
-              />
-            </div>
+            {/* NAME */}
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter KYC Form Name"
+              className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-400"
+            />
 
-            {/* Add Field Button */}
+            {/* ADD FIELD */}
             <button
               onClick={addField}
               className="text-sm bg-blue-600 text-white px-3 py-2 rounded-md hover:bg-blue-700 transition"
@@ -228,14 +255,13 @@ export default function CreateKyc() {
               Add Field Option
             </button>
 
-            {/* Fields List */}
+            {/* FIELD LIST */}
             <div className="space-y-3">
               {fields.map((field, i) => (
                 <div
                   key={i}
-                  className="flex flex-wrap md:flex-nowrap items-center gap-2 border p-3 rounded-lg bg-white relative"
+                  className="flex flex-wrap md:flex-nowrap items-center gap-2 border p-3 rounded-lg bg-white"
                 >
-                  {/* Label Input */}
                   <input
                     type="text"
                     placeholder="Field Label"
@@ -243,12 +269,10 @@ export default function CreateKyc() {
                     onChange={(e) =>
                       updateField(i, "label", e.target.value)
                     }
-                    className="flex-1 border px-3 py-2 rounded-md focus:ring-2 focus:ring-blue-400"
+                    className="flex-1 border px-3 py-2 rounded-md"
                   />
 
-                  {/* Type Selector */}
                   <select
-                  title="Field Type"
                     value={field.type}
                     onChange={(e) =>
                       updateField(i, "type", e.target.value as "text" | "file")
@@ -259,22 +283,19 @@ export default function CreateKyc() {
                     <option value="file">File Upload</option>
                   </select>
 
-                  {/* Required Selector */}
                   <select
-                  title="Required Field"
-                    value={field.required ? "Required" : "Not Required"}
+                    value={field.required ? "Required" : "Optional"}
                     onChange={(e) =>
                       updateField(i, "required", e.target.value === "Required")
                     }
                     className="border rounded-md px-3 py-2"
                   >
                     <option value="Required">Required</option>
-                    <option value="Not Required">Not Required</option>
+                    <option value="Optional">Optional</option>
                   </select>
 
-                  {/* Remove Button */}
                   <button
-                  title="Remove Field"
+                    title="Remove Field"
                     onClick={() => removeField(i)}
                     className="text-red-500 hover:text-red-700"
                   >
@@ -284,38 +305,36 @@ export default function CreateKyc() {
               ))}
             </div>
 
-            {/* Status Buttons */}
-            <div>
-              <p className="text-sm font-medium text-gray-700 mb-1">Status:</p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setStatus("active")}
-                  className={`px-4 py-2 rounded-md border transition ${
-                    status === "active"
-                      ? "bg-green-600 text-white"
-                      : "bg-white hover:bg-green-50"
-                  }`}
-                >
-                  Active
-                </button>
-                <button
-                  onClick={() => setStatus("deactivated")}
-                  className={`px-4 py-2 rounded-md border transition ${
-                    status === "deactivated"
-                      ? "bg-red-600 text-white"
-                      : "bg-white hover:bg-red-50"
-                  }`}
-                >
-                  Deactivated
-                </button>
-              </div>
+            {/* STATUS */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setStatus("active")}
+                className={`px-4 py-2 rounded-md border ${
+                  status === "active"
+                    ? "bg-green-600 text-white"
+                    : "bg-white hover:bg-green-50"
+                }`}
+              >
+                Active
+              </button>
+
+              <button
+                onClick={() => setStatus("deactivated")}
+                className={`px-4 py-2 rounded-md border ${
+                  status === "deactivated"
+                    ? "bg-red-600 text-white"
+                    : "bg-white hover:bg-red-50"
+                }`}
+              >
+                Deactivated
+              </button>
             </div>
 
-            {/* Save Changes */}
+            {/* SAVE */}
             <button
               onClick={handleSave}
               disabled={loading}
-              className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-md font-medium transition flex items-center justify-center"
+              className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-md flex justify-center items-center"
             >
               {loading ? (
                 <>
@@ -332,7 +351,7 @@ export default function CreateKyc() {
         </div>
       )}
 
-      {/* ==== KYC TABLE ==== */}
+      {/* TABLE */}
       <div className="bg-white rounded-xl shadow-sm border p-4">
         {fetching ? (
           <div className="flex justify-center py-6 text-gray-500">
@@ -348,6 +367,7 @@ export default function CreateKyc() {
                 <th className="py-2 px-3">ACTION</th>
               </tr>
             </thead>
+
             <tbody>
               {forms.length === 0 ? (
                 <tr>
@@ -356,12 +376,13 @@ export default function CreateKyc() {
                   </td>
                 </tr>
               ) : (
-                forms.map((form, index) => (
+                forms.map((form) => (
                   <tr
-                    key={index}
+                    key={form.id}
                     className="border-b hover:bg-gray-50 transition text-sm"
                   >
                     <td className="py-2 px-3 font-medium">{form.name}</td>
+
                     <td
                       className={`py-2 px-3 font-semibold ${
                         form.status === "active"
@@ -371,17 +392,21 @@ export default function CreateKyc() {
                     >
                       {form.status}
                     </td>
+
                     <td className="py-2 px-3 flex items-center gap-3">
                       <button
-                      title="Edit KYC Form"
+                        title="Edit KYC Form"
                         onClick={() => handleEdit(form)}
                         className="p-2 bg-blue-50 hover:bg-blue-100 rounded-full"
                       >
                         <Edit size={16} className="text-blue-600" />
                       </button>
+
                       <button
-                      title="Delete KYC Form"
-                        onClick={() => handleDelete(index)}
+                        title="Delete KYC Form"
+                        onClick={() =>
+                          handleDelete(forms.findIndex((f) => f.id === form.id))
+                        }
                         className="p-2 bg-red-50 hover:bg-red-100 rounded-full"
                       >
                         <Trash size={16} className="text-red-600" />

@@ -2,8 +2,8 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import asyncHandler from "express-async-handler";
-import User, { IUser } from "../models/User";
-import Admin from "../models/Admin";
+
+import prisma from "../lib/prisma";
 
 interface JwtPayload {
   id: string;
@@ -18,9 +18,15 @@ export const protect = asyncHandler(async (req: any, res: Response, next: NextFu
       token = req.headers.authorization.split(" ")[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as JwtPayload;
       if (decoded.role === "admin" || decoded.role === "superadmin") {
-        req.user = await Admin.findById(decoded.id).select("-password");
+        req.user = await prisma.admin.findUnique({
+          where: { id: decoded.id },
+          select: { id: true, email: true, role: true },
+        });
       } else {
-        req.user = await User.findById(decoded.id).select("-password");
+        req.user = await prisma.user.findUnique({
+          where: { id: decoded.id },
+          select: { id: true, email: true, role: true },
+        });
       }
 
       if (!req.user) {
