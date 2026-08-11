@@ -1,6 +1,8 @@
+// server/src/routes/KycRoutes.ts
+
 import express from "express";
 import { protect, admin } from "../middleware/authMiddleware";
-import { upload } from "../middleware/s3Upload";
+import { upload } from "../middleware/cloudinaryUpload"; // Updated import
 import {
   createKycForm,
   getAllKycForms,
@@ -26,7 +28,7 @@ router.put("/admin/submissions/:id/status", protect, admin, updateKycStatus);
 
 /* =============== USER ROUTES =============== */
 router.get("/forms/active", protect, getActiveKycForms);
-router.post("/submit", protect, upload.any(), submitUserKyc);
+router.post("/submit", protect, upload.any(), submitUserKyc); // upload.any() will handle Cloudinary
 router.get("/my", protect, getUserKyc);
 
 export default router;

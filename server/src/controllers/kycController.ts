@@ -149,7 +149,6 @@ export const submitUserKyc = asyncHandler(
     console.log("========= KYC SUBMISSION START =========");
 
     try {
-      /* ================= USER ================= */
       const userId = req.user?.id;
       console.log("User ID:", userId);
 
@@ -159,15 +158,12 @@ export const submitUserKyc = asyncHandler(
         return;
       }
 
-      /* ================= BODY ================= */
       console.log("Raw req.body:", req.body);
 
       let { formId, fields } = req.body;
 
       console.log("Form ID:", formId);
       console.log("Fields (before parse):", fields);
-
-      /* ================= PARSE FIELDS ================= */
 
       if (!fields) {
         console.log("⚠️ fields is undefined, setting empty object");
@@ -185,28 +181,26 @@ export const submitUserKyc = asyncHandler(
         }
       }
 
-      /* ================= FILES ================= */
-
       console.log("Raw req.files:", req.files);
 
+      // Handle Cloudinary file URLs
       if (req.files && Array.isArray(req.files)) {
         req.files.forEach((file: any) => {
           console.log("Uploaded File:", {
             fieldname: file.fieldname,
-            location: file.location,
+            path: file.path, // Cloudinary URL
             originalname: file.originalname,
           });
 
-          if (file.location) {
-            fields[file.fieldname] = file.location;
+          if (file.path) { // Cloudinary uses 'path' property
+            fields[file.fieldname] = file.path;
           }
         });
       }
 
       console.log("Fields after file injection:", fields);
 
-      /* ================= EXISTING SUBMISSION ================= */
-
+      // Check existing submission
       console.log("Checking existing submission...");
 
       const existing = await prisma.kycSubmission.findFirst({
@@ -215,12 +209,9 @@ export const submitUserKyc = asyncHandler(
 
       console.log("Existing submission:", existing);
 
-      /* ================= RESUBMISSION ================= */
-
       if (existing) {
         if (existing.status === "pending") {
           console.log("❌ Submission already pending");
-
           res.status(400).json({
             message: "KYC already submitted and pending review",
           });
@@ -229,7 +220,6 @@ export const submitUserKyc = asyncHandler(
 
         if (existing.status === "approved") {
           console.log("❌ Submission already approved");
-
           res.status(400).json({
             message: "KYC already approved — cannot resubmit",
           });
@@ -262,11 +252,8 @@ export const submitUserKyc = asyncHandler(
         });
 
         console.log("========= KYC RESUBMISSION COMPLETE =========");
-
         return;
       }
-
-      /* ================= CREATE NEW ================= */
 
       console.log("Creating new KYC submission...");
 
@@ -296,7 +283,6 @@ export const submitUserKyc = asyncHandler(
       console.log("========= KYC SUBMISSION COMPLETE =========");
     } catch (error) {
       console.error("🔥 KYC SUBMISSION ERROR:", error);
-
       res.status(500).json({
         message: "Internal Server Error",
       });

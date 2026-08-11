@@ -1,37 +1,19 @@
 // server/src/routes/uploadRoutes.ts
+
 import express from "express";
 import multer from "multer";
-import { v2 as cloudinary } from "cloudinary";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
+import { upload } from "../middleware/cloudinaryUpload";
 
 const router = express.Router();
 
-// ✅ Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-// ✅ Setup Cloudinary Storage
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: async (req, file) => ({
-    folder: "surplusyield_uploads",
-    resource_type: "image",
-    format: undefined, // auto-detect
-    public_id: `${Date.now()}-${file.originalname.split(".")[0]}`,
-  }),
-});
-
-const upload = multer({ storage });
-
-// ✅ Upload route
-// ✅ Upload route
+// ✅ Upload route using Cloudinary
 router.post("/", (req, res, next) => {
-  upload.single("file")(req, res, (err: any) => {
+  // Using the general upload from cloudinaryUpload
+  const uploadSingle = upload.single("file");
+  
+  uploadSingle(req, res, (err: any) => {
     if (err) {
-      console.error("❌ Multer/Cloudinary upload error:", err);
+      console.error("❌ Cloudinary upload error:", err);
       return res.status(500).json({
         message: "Upload failed",
         error: err.message || err,
@@ -44,7 +26,34 @@ router.post("/", (req, res, next) => {
     }
 
     console.log("✅ Uploaded to Cloudinary:", req.file);
+    // Cloudinary URL is in req.file.path
     res.json({ imageUrl: (req.file as any).path });
+  });
+});
+
+// Route for multiple file uploads
+router.post("/multiple", (req, res, next) => {
+  const uploadMultiple = upload.array("files", 5);
+  
+  uploadMultiple(req, res, (err: any) => {
+    if (err) {
+      console.error("❌ Cloudinary upload error:", err);
+      return res.status(500).json({
+        message: "Upload failed",
+        error: err.message || err,
+      });
+    }
+
+    if (!req.files || (req.files as Express.Multer.File[]).length === 0) {
+      console.error("❌ No files received");
+      return res.status(400).json({ message: "No files uploaded" });
+    }
+
+    const files = req.files as Express.Multer.File[];
+    const fileUrls = files.map((file: any) => file.path);
+    
+    console.log("✅ Uploaded files to Cloudinary:", fileUrls);
+    res.json({ imageUrls: fileUrls });
   });
 });
 
